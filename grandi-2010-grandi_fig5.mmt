@@ -1,0 +1,854 @@
+[[model]]
+name: grandi-2010
+author: Michael Clerx
+desc: """
+    Grandi 2010 model of the human ventricular myocyte.
+
+    ---------------------------------------------------------------------------
+
+    A novel computational model of the human ventricular action potential and
+    Ca transient
+
+    Geoffrey Nunns
+    Bioengineering Institute, University of Auckland
+    
+    This CellML model is part of a CellML 1.1 model, this segment contains all
+    the model equations describing cellular species. It is imported by smaller
+    CellML models which describe different voltage protocols, and does not run
+    as a standalone model. The units are consistent throughout.
+    
+    ABSTRACT: We have developed a detailed mathematical model for Ca handling
+    and ionic currents in the human ventricular myocyte. Our aims were to: (1)
+    simulate basic excitation-contraction coupling phenomena; (2) use realistic
+    repolarizing K current densities; (3) reach steady-state. The model relies
+    on the framework of the rabbit myocyte model previously developed by our
+    group, with subsarcolemmal and junctional compartments where ion channels
+    sense higher [Ca] vs. bulk cytosol. Ion channels and transporters have been
+    modeled on the basis of the most recent experimental data from human
+    ventricular myocytes. Rapidly and slowly inactivating components of I(to)
+    have been formulated to differentiate between endocardial and epicardial
+    myocytes. Transmural gradients of Ca handling proteins and Na pump were
+    also simulated. The model has been validated against a wide set of
+    experimental data including action potential duration (APD) adaptation and
+    restitution, frequency-dependent increase in Ca transient peak and [Na](i).
+    Interestingly, Na accumulation at fast heart rate is a major determinant of
+    APD shortening, via outward shifts in Na pump and Na-Ca exchange currents.
+    We investigated the effects of blocking K currents on APD and
+    repolarization reserve: I(Ks) block does not affect the former and slightly
+    reduces the latter; I(K1) blockade modestly increases APD and more strongly
+    reduces repolarization reserve; I(Kr) blockers significantly prolong APD,
+    an effect exacerbated as pacing frequency is decreased, in good agreement
+    with experimental results in human myocytes. We conclude that this model
+    provides a useful framework to explore excitation-contraction coupling
+    mechanisms and repolarization abnormalities at the single myocyte level.
+    
+    The original paper reference is cited below:
+    
+    A novel computational model of the human ventricular action potential and
+    Ca transient, Eleonora Grandi, Francesco S. Pasqualini, Donald M. Bers,
+    2010, Journal of Molecular and Cellular Cardiology, volume 48, 112-121.
+    """
+# Initial values
+membrane.V    = -81.3 #-8.17787190210759292e+01
+ina.m         =  3.54679797550979010e-03
+ina.h         =  6.37518080871252391e-01
+ina.j         =  6.35359766463064912e-01
+ikr.x_kr      =  3.06611993147495980e-02
+iks.x_ks      =  4.18445578799132075e-03
+ito.x_to_s    =  4.29617909070972501e-04
+ito.y_to_s    =  7.41622038444247456e-01
+ito.x_to_f    =  4.29612359729970644e-04
+ito.y_to_f    =  9.99996104517911877e-01
+ical.d        =  2.77068022513104505e-06
+ical.f        =  9.95322303939510267e-01
+ical.f_Ca_Bj  =  2.15008830800119295e-02
+ical.f_Ca_Bsl =  1.38888168414593397e-02
+caflux.Ry_Rr  =  8.75077121070150121e-01
+caflux.Ry_Ro  =  4.11199541044039948e-07
+caflux.Ry_Ri  =  5.87363415790563762e-08
+bufna.Na_Bj   =  3.58213444446927065e+00
+bufna.Na_Bsl  =  7.81698668905209226e-01
+bufca.Tn_CL   =  7.53838610928425114e-03
+bufca.Tn_CHc  =  1.07853333366311643e-01
+bufca.Tn_CHm  =  1.52016011086265855e-02
+bufca.CaM     =  2.44045247704509897e-04
+bufca.Myo_c   =  1.29620654465419246e-03
+bufca.Myo_m   =  1.38196302221029049e-01
+bufca.SRB     =  1.83224364395441854e-03
+bufca2.SLL_j  =  6.41717782985620419e-03
+bufca2.SLL_sl =  8.94195355945789049e-03
+bufca2.SLH_j  =  6.70229305164633804e-02
+bufca2.SLH_sl =  1.06210503478607152e-01
+bufca3.Csqn_b =  1.04780102739851411e+00
+bufca3.Ca_sr  =  4.38778100992401832e-01
+sodium.Na_j   =  9.02772294161908739e+00
+sodium.Na_sl  =  9.02976602719007815e+00
+sodium.Na_i   =  9.03014355539893643e+00
+potassium.K_i =  120.0
+calcium.Ca_j  =  1.52139683151191081e-04
+calcium.Ca_sl =  9.63365107530515948e-05
+calcium.Ca_i  =  7.18777439568944510e-05
+
+#
+# Simulation engine inputs
+#
+[engine]
+time = 0 in [ms] bind time
+pace = 0 bind pace
+
+#
+# Cell type
+#
+[type]
+epi = 0
+    desc: 1 For epicardial cell, 0 for endocardial cell
+
+#
+# Membrane potential
+#
+# Supplement 1.17, page 10
+#
+[membrane]
+dot(V) = -(i_ion + stimulus.i_stim)
+    in [mV]
+    label membrane_potential
+i_ion = I_Na_tot + I_Cl_tot + I_Ca_tot + potassium.I_K_tot
+    in [A/F]
+    label cellular_current
+I_Ca_tot = calcium.I_Ca_tot_junc + calcium.I_Ca_tot_sl
+    in [A/F]
+I_Cl_tot = iclca.iclca + iclb.IClb
+    in [A/F]
+I_Na_tot = sodium.I_Na_tot_junc + sodium.I_Na_tot_sl
+    in [A/F]
+
+#
+# Stimulus current
+#
+[stimulus]
+i_stim = engine.pace * stim_amplitude
+stim_amplitude = -80
+
+#
+# Fast sodium current
+#
+# Supplement 1.1, page 2
+#
+[ina]
+use membrane.V
+GNa = 23 [mS/uF]
+I_Na_junc = frac.Fjunc * GNa * m ^ 3 * h * j * (V - rev.ena_junc)
+    in [A/F]
+I_Na_sl = frac.Fsl * GNa * m ^ 3 * h * j * (V - rev.ena_sl)
+    in [A/F]
+dot(m) = (inf - m) / tau
+    inf = 1 / (1 + exp(-(56.86 + V) / 9.03)) ^ 2
+    tau = 0.1292 * exp(-((V + 45.79) / 15.54) ^ 2) + 0.06487 * exp(-((V - 4.823) / 51.12) ^ 2)
+dot(h) = (hss - h) / tauh
+    hss = 1 / (1 + exp((V + 71.55) / 7.43)) ^ 2
+    ah = if(V >= -40 , 0, 0.057 * exp(-(V + 80) / 6.8))
+    bh = if(V >= -40 , 0.77 / (0.13 * (1 + exp(-(V + 10.66) / 11.1))), 2.7 * exp(0.079 * V) + 310000 * exp(0.3485 * V))
+    tauh = 1 / (ah + bh)
+dot(j) = (jss - j) / tauj
+    jss = 1 / (1 + exp((V + 71.55) / 7.43)) ^ 2
+    aj = piecewise(V >= -40 , 0, (-25428 * exp(0.2444 * V) - 6.948e-6 * exp(-0.04391 * V)) * (V + 37.78) / (1 + exp(0.311 * (V + 79.23))))
+    bj = piecewise(V >= -40 , 0.6 * exp(0.057 * V) / (1 + exp(-0.1 * (V + 32))), 0.02424 * exp(-0.01052 * V) / (1 + exp(-0.1378 * (V + 40.14))))
+    tauj = 1 / (aj + bj)
+
+#
+# Background sodium current
+#
+# Supplement 1.2, page 3
+#
+[inab]
+use membrane.V
+GNaB = 0.000597 [mS/uF]
+I_nabk_junc = frac.Fjunc * GNaB * (V - rev.ena_junc)
+    in [A/F]
+I_nabk_sl = frac.Fsl * GNaB * (V - rev.ena_sl)
+    in [A/F]
+
+#
+# Na/K pump current
+#
+# Supplement 1.3, page 3
+#
+[inak]
+use membrane.V
+KmKo = 1.5 [mM]
+KmNaip = 11 [mM]
+IbarNaK = 1.8 [A/F]
+I_nak = I_nak_junc + I_nak_sl
+    in [A/F]
+I_nak_junc = frac.Fjunc * IbarNaK * fnak * ion.Ko / (1 + (KmNaip / sodium.Na_j) ^ 4) / (ion.Ko + KmKo)
+    in [A/F]
+I_nak_sl = frac.Fsl * IbarNaK * fnak * ion.Ko / (1 + (KmNaip / sodium.Na_sl) ^ 4) / (ion.Ko + KmKo)
+    in [A/F]
+fnak = 1 / (1 + 0.1245 * exp(-0.1 * V * phys.FRT) + 0.0365 * sigma * exp(-V * phys.FRT))
+    sigma = (exp(ion.Nao / 67.3) - 1) / 7
+
+#
+# Rapidly activating potassium current
+#
+# Supplement 1.4, page 3
+#
+[ikr]
+use membrane.V
+I_kr = gkr * x_kr * rkr * (V - rev.ek)
+    in [A/F]
+gkr = 0.035 * sqrt(ion.Ko / 5.4)
+    in [mS/uF]
+rkr = 1 / (1 + exp((V + 74) / 24))
+dot(x_kr) = (xrss - x_kr) / tauxr
+    xrss = 1 / (1 + exp(-(V + 10) / 5))
+    tauxr = 550 / (1 + exp((-22 - V) / 9)) * 6 / (1 + exp((V - -11) / 9)) + 230 / (1 + exp((V - -40) / 20))
+
+#
+# Slowly activating potassium current
+#
+# Supplement 1.5, page 4
+#
+[iks]
+use membrane.V
+I_ks = I_ks_junc + I_ks_sl
+    in [A/F]
+I_ks_junc = frac.Fjunc * gks_junc * x_ks ^ 2 * (V - rev.eks)
+    in [A/F]
+I_ks_sl = frac.Fsl * gks_sl * x_ks ^ 2 * (V - rev.eks)
+    in [A/F]
+gks_junc = 0.0035 [mS/uF]
+gks_sl = 0.0035 [mS/uF]
+dot(x_ks) = (xsss - x_ks) / tauxs
+    tauxs = 990.1 / (1 + exp(-(V + 2.436) / 14.12))
+    xsss = 1 / (1 + exp(-(V + 3.8) / 14.25))
+
+#
+# Plateau potassium current
+#
+# Supplement 1.6, page 4
+#
+[ikp]
+use membrane.V
+gkp = 0.002 [mS/uF]
+I_kp = I_kp_junc + I_kp_sl
+    in [A/F]
+I_kp_junc = frac.Fjunc * gkp * kp_kp * (V - rev.ek)
+    in [A/F]
+I_kp_sl = frac.Fsl * gkp * kp_kp * (V - rev.ek)
+    in [A/F]
+kp_kp = 1 / (1 + exp(7.488 - V / 5.98))
+
+#
+# Transient outward potassium current (fast and slow components)
+#
+# Supplement 1.7, page 4
+#
+[ito]
+use membrane.V
+ito = I_tos + I_tof
+    in [A/F]
+I_tof = GtoFast * x_to_f * y_to_f * (V - rev.ek)
+    in [A/F]
+I_tos = GtoSlow * x_to_s * y_to_s * (V - rev.ek)
+    in [A/F]
+GtoFast = if(type.epi == 1, 1 * 0.13 * 0.88, 0.13 * 0.3 * 0.036)
+    in [mS/uF]
+GtoSlow = if(type.epi == 1, 1 * 0.13 * 0.12, 0.13 * 0.3 * 0.964)
+    in [mS/uF]
+xtoss = 1 / (1 + exp(-(V - 19) / 13))
+ytoss = 1 / (1 + exp((V + 19.5) / 5))
+dot(x_to_f) = (xtoss - x_to_f) / tauxtof
+    tauxtof = 8.5 * exp(-((V + 45) / 50) ^ 2) + 0.5
+dot(x_to_s) = (xtoss - x_to_s) / tauxtos
+    tauxtos = 9 / (1 + exp((V + 3) / 15)) + 0.5
+dot(y_to_f) = (ytoss - y_to_f) / tauytof
+    tauytof = 85 * exp(-(V + 40) ^ 2 / 220) + 7
+dot(y_to_s) = (ytoss - y_to_s) / tauytos
+    tauytos = 800 / (1 + exp((V + 60) / 10)) + 30
+
+#
+# Inward recitifer potassium current
+#
+# Supplement 1.8, page 5
+#
+[ik1]
+use membrane.V
+I_k1 = 1 * 0.35 * sqrt(ion.Ko / 5.4) * inf * (V - rev.ek)
+    in [A/F]
+inf = a / (a + b)
+    a = 1.02 / (1 + exp(0.2385 * (V - rev.ek - 59.215)))
+    b = (0.49124 * exp(0.08032 * (V + 5.476 - rev.ek)) + exp(0.06175 * (V - rev.ek - 594.31))) / (1 + exp(-0.5143 * (V - rev.ek + 4.753)))
+
+#
+# Calcium activated Chloride current
+#
+# Supplement 1.9, page 5
+#
+[iclca]
+use membrane.V
+KdClCa = 0.1 [mM]
+GClCa = 0.5 * 0.109625
+    in [mS/uF]
+iclca = I_ClCa_junc + I_ClCa_sl
+    in [A/F]
+I_ClCa_junc = frac.Fjunc * GClCa / (1 + KdClCa / calcium.Ca_j) * (V - rev.ecl)
+    in [A/F]
+I_ClCa_sl = frac.Fsl * GClCa / (1 + KdClCa / calcium.Ca_sl) * (V - rev.ecl)
+    in [A/F]
+
+#
+# Background Chloride current
+#
+# Supplement 1.10, page 5
+#
+[iclb]
+GClB = 1 * 0.009
+IClb = GClB * (membrane.V - rev.ecl)
+    in [A/F]
+
+#
+# L-type calcium current
+#
+# Supplement 1.11, page 6
+#
+[ical]
+use membrane.V
+fcaCaMSL = 0
+fcaCaj = 0
+Q10CaL = 1.8
+Q = Q10CaL ^ phys.Qpow * 0.45
+pCa = 0.5 * 0.00054
+    in [cm/s]
+pK = 0.5 * 2.7e-7
+    in [cm/s]
+pNa = 0.5 * 1.5e-8
+    in [cm/s]
+I_Ca_junc = frac.Fjunc_CaL * ibarca_j * d * f * (1 - f_Ca_Bj + fcaCaj) * Q
+    in [A/F]
+    desc: Equation 75
+I_CaNa_sl = frac.Fsl_CaL * ibarna_sl * d * f * (1 - f_Ca_Bsl + fcaCaMSL) * Q
+    in [A/F]
+    desc: Equation 76
+I_CaK = ibark * d * f * (frac.Fjunc_CaL * (fcaCaj + (1 - f_Ca_Bj)) + frac.Fsl_CaL * (fcaCaMSL + (1 - f_Ca_Bsl))) * Q
+    in [A/F]
+I_CaNa_junc = frac.Fjunc_CaL * ibarna_j * d * f * (1 - f_Ca_Bj + fcaCaj) * Q
+    in [A/F]
+I_Ca_sl = frac.Fsl_CaL * ibarca_sl * d * f * (1 - f_Ca_Bsl + fcaCaMSL) * Q
+    in [A/F]
+dot(d) = (dss - d) / taud
+    dss = 1 / (1 + exp(-(V + 5) / 6))
+    taud = dss * (1 - exp(-(V + 5) / 6)) / (0.035 * (V + 5))
+dot(f) = (fss - f) / tauf
+    fss = 1 / (1 + exp((V + 35) / 9)) + 0.6 / (1 + exp((50 - V) / 20))
+    tauf = 1 / (0.0197 * exp(-(0.0337 * (V + 14.5)) ^ 2) + 0.02)
+dot(f_Ca_Bj) = 1.7 * calcium.Ca_j / 1 * (1 - f_Ca_Bj) - 0.0119 * f_Ca_Bj
+dot(f_Ca_Bsl) = 1.7 * calcium.Ca_sl / 1 * (1 - f_Ca_Bsl) - 0.0119 * f_Ca_Bsl
+ibarca_j = pCa * 4 * V * phys.F * phys.FRT * (0.341 * calcium.Ca_j * exp(2 * V * phys.FRT) - 0.341 * ion.Cao) / (exp(2 * V * phys.FRT) - 1)
+    in [A/F]
+ibarca_sl = pCa * 4 * V * phys.F * phys.FRT * (0.341 * calcium.Ca_sl * exp(2 * V * phys.FRT) - 0.341 * ion.Cao) / (exp(2 * V * phys.FRT) - 1)
+    in [A/F]
+ibark = pK * V * phys.F * phys.FRT * (0.75 * potassium.K_i * exp(V * phys.FRT) - 0.75 * ion.Ko) / (exp(V * phys.FRT) - 1)
+    in [A/F]
+ibarna_j = pNa * V * phys.F * phys.FRT * (0.75 * sodium.Na_j * exp(V * phys.FRT) - 0.75 * ion.Nao) / (exp(V * phys.FRT) - 1)
+    in [A/F]
+ibarna_sl = pNa * V * phys.F * phys.FRT * (0.75 * sodium.Na_sl * exp(V * phys.FRT) - 0.75 * ion.Nao) / (exp(V * phys.FRT) - 1)
+    in [A/F]
+
+#
+# Sodium/Calcium exchanger current
+#
+# Supplement 1.12, page 7
+#
+[incx]
+use membrane.V
+IbarNCX = 4.5 [A/F]
+Kdact = 0.00015 [mM]
+KmCai = 0.00359 [mM]
+KmCao = 1.3 [mM]
+KmNai = 12.29 [mM]
+KmNao = 87.5 [mM]
+Q10NCX = 1.57
+ksat = 0.32
+nu = 0.27
+I_ncx_junc = frac.Fjunc * IbarNCX * Q10NCX ^ phys.Qpow * Ka_junc * (s1_junc - s2_junc) / s3_junc / (1 + ksat * exp((nu - 1) * V * phys.FRT))
+    in [A/F]
+    Ka_junc = 1 / (1 + (Kdact / calcium.Ca_j) ^ 2)
+    s1_junc = exp(nu * V * phys.FRT) * sodium.Na_j ^ 3 * ion.Cao
+    s2_junc = exp((nu - 1) * V * phys.FRT) * ion.Nao ^ 3 * calcium.Ca_j
+    s3_junc = KmCai * ion.Nao ^ 3 * (1 + (sodium.Na_j / KmNai) ^ 3) + KmNao ^ 3 * calcium.Ca_j * (1 + calcium.Ca_j / KmCai) + KmCao * sodium.Na_j ^ 3 + sodium.Na_j ^ 3 * ion.Cao + ion.Nao ^ 3 * calcium.Ca_j
+I_ncx_sl = frac.Fsl * IbarNCX * Q10NCX ^ phys.Qpow * Ka_sl * (s1_sl - s2_sl) / s3_sl / (1 + ksat * exp((nu - 1) * V * phys.FRT))
+    in [A/F]
+    Ka_sl = 1 / (1 + (Kdact / calcium.Ca_sl) ^ 2)
+    s1_sl = exp(nu * V * phys.FRT) * sodium.Na_sl ^ 3 * ion.Cao
+    s2_sl = exp((nu - 1) * V * phys.FRT) * ion.Nao ^ 3 * calcium.Ca_sl
+    s3_sl = KmCai * ion.Nao ^ 3 * (1 + (sodium.Na_sl / KmNai) ^ 3) + KmNao ^ 3 * calcium.Ca_sl * (1 + calcium.Ca_sl / KmCai) + KmCao * sodium.Na_sl ^ 3 + sodium.Na_sl ^ 3 * ion.Cao + ion.Nao ^ 3 * calcium.Ca_sl
+
+#
+# Sarcolemmal calcium pump current
+#
+# Supplement 1.13, page 8
+#
+[ipca]
+use membrane.V
+use calcium.Ca_j, calcium.Ca_sl
+KmPCa = 0.0005 [mM]
+Q10SLCaP = 2.35
+IbarSLCaP = 0.0673 [A/F]
+I_pca_junc = frac.Fjunc * Q10SLCaP ^ phys.Qpow * IbarSLCaP * Ca_j ^ 1.6 / (KmPCa ^ 1.6 + Ca_j ^ 1.6)
+    in [A/F]
+I_pca_sl = frac.Fsl * Q10SLCaP ^ phys.Qpow * IbarSLCaP * Ca_sl ^ 1.6 / (KmPCa ^ 1.6 + Ca_sl ^ 1.6)
+    in [A/F]
+
+#
+# Background calcium current
+#
+# Supplement 1.14, page 8
+#
+[icabk]
+use membrane.V
+GCaB = 0.0005513 [mS/uF]
+I_cabk_junc = frac.Fjunc * GCaB * (V - rev.eca_junc)
+    in [A/F]
+I_cabk_sl = frac.Fsl * GCaB * (V - rev.eca_sl)
+    in [A/F]
+
+#
+# SR fluxes: calcium release, SR calciump pump, SR calcium leak
+#
+# Supplement 1.15, page 8
+#
+[caflux]
+use calcium.Ca_i, calcium.Ca_j
+Kmf = 0.000246 [mM]
+Kmr = 1.7 [mM]
+Q10SRCaP = 2.6
+ec50SR = 0.45 [mM]
+hillSRCaP = 1.787
+kim = 0.005 [mS/uF]
+kom = 0.06 [mS/uF]
+kiCa = 0.5 [1/mM/ms]
+koCa = 10 [1/mM^2/ms]
+ks = 25 [mS/uF]
+J_SRCarel = ks * Ry_Ro / 1 * (bufca3.Ca_sr - Ca_j)
+    in [mM/ms]
+J_SRleak = 5.348e-6 * (bufca3.Ca_sr - Ca_j)
+    in [mM/ms]
+J_serca = Q10SRCaP ^ phys.Qpow * env.Vmax_SRCaP * ((Ca_i / Kmf) ^ hillSRCaP - (bufca3.Ca_sr / Kmr) ^ hillSRCaP) / (1 + (Ca_i / Kmf) ^ hillSRCaP + (bufca3.Ca_sr / Kmr) ^ hillSRCaP)
+    in [mM/ms]
+MaxSR = 15
+MinSR = 1
+RI = 1 - Ry_Rr - Ry_Ro - Ry_Ri
+    in [mM]
+kCaSR = MaxSR - (MaxSR - MinSR) / (1 + (ec50SR / bufca3.Ca_sr) ^ 2.5)
+kiSRCa = kiCa * kCaSR
+koSRCa = koCa / kCaSR
+dot(Ry_Ri) = kiSRCa * Ca_j * Ry_Ro - kim * Ry_Ri - (kom * Ry_Ri - koSRCa * Ca_j ^ 2 * RI)
+    in [mM]
+dot(Ry_Ro) = koSRCa * Ca_j ^ 2 * Ry_Rr - kom * Ry_Ro - (kiSRCa * Ca_j * Ry_Ro - kim * Ry_Ri)
+    in [mM]
+dot(Ry_Rr) = kim * RI - kiSRCa * Ca_j * Ry_Rr - (koSRCa * Ca_j ^ 2 * Ry_Rr - kom * Ry_Ro)
+    in [mM]
+
+#
+# Sodium buffers
+#
+# Supplement 1.16.1, page 9
+#
+[bufna]
+Bmax_Naj = 7.561 [mM]
+Bmax_Nasl = 1.65 [mM]
+koff_na = 0.001 [mS/uF]
+kon_na = 0.0001 [1/mM/ms]
+dot(Na_Bj) = dNa_Bj_dt
+    in [mM]
+dot(Na_Bsl) = dNa_Bsl_dt
+    in [mM]
+dNa_Bj_dt = kon_na * sodium.Na_j * (Bmax_Naj - Na_Bj) - koff_na * Na_Bj
+    in [mM/ms]
+dNa_Bsl_dt = kon_na * sodium.Na_sl * (Bmax_Nasl - Na_Bsl) - koff_na * Na_Bsl
+    in [mM/ms]
+
+#
+# Cytosolic calcium buffers
+#
+# Supplement 1.16.2, page 9
+#
+[bufca]
+Bmax_CaM = 0.024 [mM]
+Bmax_SR = 19 * 0.0009
+Bmax_TnChigh = 0.14 [mM]
+Bmax_TnClow = 0.07 [mM]
+Bmax_myosin = 0.14 [mM]
+koff_cam = 0.238 [mS/uF]
+koff_myoca = 0.00046 [mS/uF]
+koff_myomg = 5.7e-5 [mS/uF]
+koff_sr = 0.06 [mS/uF]
+koff_tnchca = 3.2e-5 [mS/uF]
+koff_tnchmg = 0.00333 [mS/uF]
+koff_tncl = 0.0196 [mS/uF]
+kon_cam = 34 [1/mM/ms]
+kon_myoca = 13.8 [1/mM/ms]
+kon_myomg = 0.0157 [1/mM/ms]
+kon_sr = 100 [1/mM/ms]
+kon_tnchca = 2.37 [1/mM/ms]
+kon_tnchmg = 0.003 [1/mM/ms]
+kon_tncl = 32.7 [1/mM/ms]
+dot(CaM) = kon_cam * calcium.Ca_i * (Bmax_CaM - CaM) - koff_cam * CaM
+    in [mM]
+J_CaB_cytosol = kon_tncl * calcium.Ca_i * (Bmax_TnClow - Tn_CL) - koff_tncl * Tn_CL + kon_tnchca * calcium.Ca_i * (Bmax_TnChigh - Tn_CHc - Tn_CHm) - koff_tnchca * Tn_CHc + kon_tnchmg * ion.Mgi * (Bmax_TnChigh - Tn_CHc - Tn_CHm) - koff_tnchmg * Tn_CHm + kon_cam * calcium.Ca_i * (Bmax_CaM - CaM) - koff_cam * CaM + kon_myoca * calcium.Ca_i * (Bmax_myosin - Myo_c - Myo_m) - koff_myoca * Myo_c + kon_myomg * ion.Mgi * (Bmax_myosin - Myo_c - Myo_m) - koff_myomg * Myo_m + (kon_sr * calcium.Ca_i * (Bmax_SR - SRB) - koff_sr * SRB)
+    in [mM/ms]
+dot(Myo_c) = kon_myoca * calcium.Ca_i * (Bmax_myosin - Myo_c - Myo_m) - koff_myoca * Myo_c
+    in [mM]
+dot(Myo_m) = kon_myomg * ion.Mgi * (Bmax_myosin - Myo_c - Myo_m) - koff_myomg * Myo_m
+    in [mM]
+dot(SRB) = kon_sr * calcium.Ca_i * (Bmax_SR - SRB) - koff_sr * SRB
+    in [mM]
+dot(Tn_CHc) = kon_tnchca * calcium.Ca_i * (Bmax_TnChigh - Tn_CHc - Tn_CHm) - koff_tnchca * Tn_CHc
+    in [mM]
+dot(Tn_CHm) = kon_tnchmg * ion.Mgi * (Bmax_TnChigh - Tn_CHc - Tn_CHm) - koff_tnchmg * Tn_CHm
+    in [mM]
+dot(Tn_CL) = kon_tncl * calcium.Ca_i * (Bmax_TnClow - Tn_CL) - koff_tncl * Tn_CL
+    in [mM]
+
+#
+# Junctional and SL calcium buffers
+#
+# Supplement 1.16.3, page 9
+#
+[bufca2]
+koff_slh = 0.03 [mS/uF]
+koff_sll = 1.3 [mS/uF]
+kon_slh = 100 [1/mM/ms]
+kon_sll = 100 [1/mM/ms]
+Bmax_SLhighj = 0.00165 * env.Vmyo / env.Vjunc * 0.1
+    in [mM]
+Bmax_SLhighsl = 0.0134 * env.Vmyo / env.Vsl
+    in [mM]
+Bmax_SLlowj = 0.0046 * env.Vmyo / env.Vjunc * 0.1
+    in [mM]
+Bmax_SLlowsl = 0.0374 * env.Vmyo / env.Vsl
+    in [mM]
+J_CaB_junction = kon_sll * calcium.Ca_j * (Bmax_SLlowj - SLL_j) - koff_sll * SLL_j + (kon_slh * calcium.Ca_j * (Bmax_SLhighj - SLH_j) - koff_slh * SLH_j)
+    in [mM/ms]
+J_CaB_sl = kon_sll * calcium.Ca_sl * (Bmax_SLlowsl - SLL_sl) - koff_sll * SLL_sl + (kon_slh * calcium.Ca_sl * (Bmax_SLhighsl - SLH_sl) - koff_slh * SLH_sl)
+    in [mM/ms]
+dot(SLH_j) = kon_slh * calcium.Ca_j * (Bmax_SLhighj - SLH_j) - koff_slh * SLH_j
+    in [mM]
+dot(SLH_sl) = kon_slh * calcium.Ca_sl * (Bmax_SLhighsl - SLH_sl) - koff_slh * SLH_sl
+    in [mM]
+dot(SLL_j) = kon_sll * calcium.Ca_j * (Bmax_SLlowj - SLL_j) - koff_sll * SLL_j
+    in [mM]
+dot(SLL_sl) = kon_sll * calcium.Ca_sl * (Bmax_SLlowsl - SLL_sl) - koff_sll * SLL_sl
+    in [mM]
+
+#
+# SR calcium buffer
+#
+# Supplement 1.16.4, page 9
+#
+[bufca3]
+koff_csqn = 65 [mS/uF]
+kon_csqn = 100 [1/mM/ms]
+Bmax_Csqn = 0.14 * env.Vmyo / env.Vsr
+    in [mM]
+dot(Ca_sr) = caflux.J_serca - (caflux.J_SRleak * env.Vmyo / env.Vsr + caflux.J_SRCarel) - (kon_csqn * Ca_sr * (Bmax_Csqn - Csqn_b) - koff_csqn * Csqn_b)
+    in [mM]
+dot(Csqn_b) = kon_csqn * Ca_sr * (Bmax_Csqn - Csqn_b) - koff_csqn * Csqn_b
+    in [mM]
+
+#
+# Sodium concentrations
+#
+# Supplement 1.16.5, page 10
+#
+[sodium]
+I_Na_tot_junc = ina.I_Na_junc + inab.I_nabk_junc + 3 * incx.I_ncx_junc + 3 * inak.I_nak_junc + ical.I_CaNa_junc
+    in [A/F]
+I_Na_tot_sl = ina.I_Na_sl + inab.I_nabk_sl + 3 * incx.I_ncx_sl + 3 * inak.I_nak_sl + ical.I_CaNa_sl
+    in [A/F]
+dot(Na_i) = env.J_na_slmyo / env.Vmyo * (Na_sl - Na_i)
+    in [mM]
+dot(Na_j) = -I_Na_tot_junc * phys.Cmem / (env.Vjunc * phys.F) + env.J_na_juncsl / env.Vjunc * (Na_sl - Na_j) - bufna.dNa_Bj_dt
+    in [mM]
+dot(Na_sl) = -I_Na_tot_sl * phys.Cmem / (env.Vsl * phys.F) + env.J_na_juncsl / env.Vsl * (Na_j - Na_sl) + env.J_na_slmyo / env.Vsl * (Na_i - Na_sl) - bufna.dNa_Bsl_dt
+    in [mM]
+
+#
+# Potassium concentrations
+#
+# Supplement 1.16.6, page 10
+#
+[potassium]
+I_K_tot = ito.ito + ikr.I_kr + iks.I_ks + ik1.I_k1 - 2 * inak.I_nak + ical.I_CaK + ikp.I_kp
+    in [A/F]
+dot(K_i) = 0 [mM/ms]
+    in [mM]
+
+#
+# Calcium concentrations
+#
+# Supplement 1.16.7, page 10
+#
+[calcium]
+dot(Ca_i) = -caflux.J_serca * env.Vsr / env.Vmyo - bufca.J_CaB_cytosol + env.J_ca_slmyo / env.Vmyo * (Ca_sl - Ca_i)
+    in [mM]
+dot(Ca_j) = -I_Ca_tot_junc * phys.Cmem / (env.Vjunc * 2 * phys.F) + env.J_ca_juncsl / env.Vjunc * (Ca_sl - Ca_j) - bufca2.J_CaB_junction + caflux.J_SRCarel * env.Vsr / env.Vjunc + caflux.J_SRleak * env.Vmyo / env.Vjunc
+    in [mM]
+dot(Ca_sl) = -I_Ca_tot_sl * phys.Cmem / (env.Vsl * 2 * phys.F) + env.J_ca_juncsl / env.Vsl * (Ca_j - Ca_sl) + env.J_ca_slmyo / env.Vsl * (Ca_i - Ca_sl) - bufca2.J_CaB_sl
+    in [mM]
+I_Ca_tot_junc = ical.I_Ca_junc + icabk.I_cabk_junc + ipca.I_pca_junc - 2 * incx.I_ncx_junc
+    in [A/F]
+I_Ca_tot_sl = ical.I_Ca_sl + icabk.I_cabk_sl + ipca.I_pca_sl - 2 * incx.I_ncx_sl
+    in [A/F]
+
+#
+# Nernst potentials
+#
+# Supplement 1.18, page 11
+#
+[rev]
+use phys.RTF
+eca_junc = 0.5 * RTF * log(ion.Cao / calcium.Ca_j)
+    in [mV]
+eca_sl = 0.5 * RTF * log(ion.Cao / calcium.Ca_sl)
+    in [mV]
+ecl = RTF * log(ion.Cli / ion.Clo)
+    in [mV]
+ek = RTF * log(ion.Ko / potassium.K_i)
+    in [mV]
+ena_junc = RTF * log(ion.Nao / sodium.Na_j)
+    in [mV]
+ena_sl = RTF * log(ion.Nao / sodium.Na_sl)
+    in [mV]
+eks = 1 / phys.FRT * log((ion.Ko + pNaK * ion.Nao) / (potassium.K_i + pNaK * sodium.Na_i))
+    in [mV]
+pNaK = 0.01833
+
+#
+# Physical constants/parameters
+#
+# Supplement 2.1, page 12
+#
+[phys]
+Cmem = 1.381e-10 [F]
+F = 96485 [C/mol]
+R = 8314 [mJ/mol/K]
+T = 310 [K]
+RTF = R * T / F
+FRT = F / (R * T)
+Qpow = (phys.T - 310) / 10
+
+#
+# Environmental parameters
+#
+# Supplement 2.2, page 12
+#
+[env]
+cellLength = 100 [um]
+cellRadius = 10.25 [um]
+Vcell =  3.14159265358979312 * cellRadius ^ 2 * cellLength * 1e-15
+Vjunc = 0.0539 * 0.01 * Vcell
+Vmax_SRCaP = 0.0053114 [mM/ms]
+Vmyo = 0.65 * Vcell
+Vsl = 0.02 * Vcell
+Vsr = 0.035 * Vcell
+J_ca_juncsl = 8.2413e-13
+J_ca_slmyo = 3.2743e-12 
+J_na_juncsl = 1.8313e-14
+J_na_slmyo = 1.6386e-12
+
+#
+# Fractional currents
+#
+# Supplement 2.3, page 12
+#
+[frac]
+Fjunc = 0.11
+Fjunc_CaL = 0.9
+Fsl = 1 - Fjunc
+Fsl_CaL = 1 - Fjunc_CaL
+
+#
+# Fixed ion concentrations
+#
+# Supplement 2.4, page 12
+#
+[ion]
+Cli = 15 [mM]
+Mgi = 1 [mM]
+Clo = 150 [mM]
+Ko = 5.4 [mM]
+Nao = 140 [mM]
+Cao = 1.8 [mM]
+
+[[protocol]]
+# Level  Start    Length   Period   Multiplier
+1.0      20    0.5      1000.0   0
+
+[[script]]
+import matplotlib.pyplot as pl
+import myokit
+
+# Get model
+m = myokit.load_model('grandi-2010.mmt')
+
+apds = []
+apds_change = []
+for pcl in [4000,2000, 1000, 500,333]:
+    # Create protocol
+    p = myokit.pacing.blocktrain(pcl, 0.5, offset=20, level=1.0, limit=0)
+    
+    # Create or update simulation with new protocol
+    s = myokit.Simulation(m, p)
+    
+    # Pre-pacing
+    s.pre(pcl * 30)
+    
+    # Do one beat & measure APD
+    vt = 0.9 * s.state()[m.get('membrane.V').indice()]
+    d = s.run(pcl)
+    apd = d.apd(threshold=vt, v='membrane.V')
+    start, apd_duration = apd[0]
+    
+    # Store apd
+    apds.append(apd_duration)
+    apds_change.append(100*(apd_duration-apds[0])/apds[0])
+        
+        
+
+freq = (0.25,0.5,1,2,3)
+
+pl.figure()
+pl.subplot(2,1,1)
+pl.plot(freq, apds)
+pl.plot(freq, apds, 'x')
+pl.show()
+pl.ylabel('APD 90 (ms)')
+pl.xlabel('Frequency (Hz)')
+pl.ylim(200,400)
+pl.subplot(2,1,2)
+pl.plot(freq[1:4], apds_change[1:4])
+pl.plot(freq[1:4], apds_change[1:4], 'x')
+pl.ylabel('APD 90 change (%)')
+pl.xlabel('Frequency (Hz)')
+pl.suptitle('Grandi (2010)- Figure 5A and 5B')
+pl.show()
+
+### Restitution ###
+### ----------- ###
+
+#APD restitution was assessed with a dynamic protocol: after establishing a
+#steady-state at a basic cycle length of 600 ms, extrastimuli were
+#applied at 20 cycle intervals, reducing the coupling interval in
+#decrements of 40, 20 and 10 ms from the drive cycle length.
+# Fig 5c: endocardial 
+
+
+'''
+step = 40
+pcl = []
+apd = []
+
+# Initialising values of extra simulus intervals from 200 to 1600
+for i in range(280, 1600 + 1, step):
+    pcl.append(i)
+pcl = pcl[::-1]
+p = myokit.pacing.blocktrain(pcl, 0.5, offset=0, level=1.0, limit=0)
+s = myokit.Simulation(m, p, apd_var='membrane.V')
+
+vt = 0.9 * s.state()[m.get('membrane.V').indice()]
+d, apds = s.run(2*pcl, apd_threshold=vt)
+apd_duration = apds['duration'][0]
+s.reset()
+s.pre(pcl * 200)
+
+for pace in DI:
+    print di
+    p = myokit.pacing.blocktrain(pcl, 0.5, offset=0, level=1.0, limit=1)
+    p.schedule(1, pace, 0.5, pcl, 1)
+    s = myokit.Simulation(m, p,apd_var='membrane.V')
+    vt = 0.9 * s.state()[m.get('membrane.V').indice()]
+    d, apds = s.run(2*pcl + di, apd_threshold=vt)
+    duration = apds['duration'][1]
+    apd.append(duration)
+
+    # Resets to the end of the pre pacing
+    s.reset()
+
+pl.figure()
+pl.plot(DI, apd)
+pl.show()
+'''
+# Pacing for S1 beats is 600ms
+pcl = 600
+p = myokit.pacing.blocktrain(pcl, 0.5, offset=0, level=1.0, limit=0)
+s = myokit.Simulation(m, p, apd_var='membrane.V')
+
+#Pre pace 19 beats (20 s1 beats in total)
+s.pre(pcl * 19)
+
+# Setting a step size to increase pacing for S2 interval by
+step_size = -50
+
+# PCL = APD +DI
+
+# APD 90
+percent = 90
+di = [] 
+period = []
+apd_duration= []
+pacing = 1600
+while pacing > 300:
+    print pacing
+    
+    # Final S1 beat
+    p = myokit.pacing.blocktrain(pcl, 0.5, offset=0, level=1.0, limit=1)
+    
+    # Introducing S2 upstroke. Offset by pacing interval
+    p.schedule(1, pacing,0.5, pcl, 1)
+    s = myokit.Simulation(m, p,apd_var='membrane.V')
+    
+    # APD threshold and running simulation
+    vt = 0.01*percent * s.state()[m.get('membrane.V').indice()]
+    d, apds = s.run(pacing + 400 , apd_threshold=vt)
+    
+    # APD of final S1 beat
+    duration0 = apds['duration'][0]
+    
+    #APD duration of S2
+    start1 = apds['start'][1]
+    duration1 = apds['duration'][1]
+    apd_duration.append(duration1)
+    
+    # DI = PCL - APD of previous beat
+    di.append(start1 - duration0)
+    period.append(pacing)
+     
+    #Step size of pacing interval increase
+    pacing += step_size
+    
+    # Reset simulation settings to pre-pacing
+    s.reset()
+    #if pacing  == 900:
+    #    pl.figure()
+    #    pl.plot(d['engine.time'],d['membrane.V'])
+    #    pl.show()
+    #    print(pacing, apd_duration)
+ 
+pl.figure()
+pl.plot(di, apd_duration)
+pl.plot(di, apd_duration, 'x',label='_nolegend_')
+pl.xlabel('Diastole interval (ms)')
+pl.ylabel('APD (ms)')
+pl.title('Ten-Tusscher (2006) 10 x S1, 1 x S2 Protocol Restitution Curve (Fig 5B)')
+pl.legend(['APD 50','APD 90'])
+pl.xlim(0,600)
+pl.show()
+
+
+pl.figure()
+pl.plot(period, apd_duration)
+pl.plot(period, apd_duration, 'x',label='_nolegend_')
+pl.xlabel('pacing')
+pl.show()
+
