@@ -1,0 +1,48 @@
+[[protocol]]
+# Level  Start    Length   Period   Multiplier
+1        100       0.5      1000     0
+
+[[script]]
+import myokit
+import matplotlib.pyplot as pl
+
+# Get the model and protocol, create a simulation
+m = myokit.load_model('tentusscher-2006.mmt')
+p = myokit.load_protocol('tentusscher-2006.mmt')
+s = myokit.Simulation(m, p)
+
+# Set cell type. Endo = 0, Epi = 1, Mid = 2
+cell_types = {'Endocardial':0, 'Epicardial':1, 'Mid-myocardial':2}
+cell_type = 'Epicardial'
+s.set_constant('cell.type', cell_types[cell_type])
+
+#Pre-pace
+s.pre(1000*50)
+
+# Run a simulation
+d = s.run(1000)
+
+pl.figure()
+pl.subplot(1,3,1)
+# Plot of membrane potential (voltage) vs time
+pl.plot(d['engine.time'], d['membrane.V'])
+pl.xlim(0,600)
+pl.xlabel('Time (ms)')
+pl.ylabel('Membrane potential [mV]')
+
+# Plot of cytoplasmic calcium
+pl.subplot(1,3,2)
+pl.plot(d['engine.time'], d['calcium.Ca_i'])
+pl.xlim(0,800)
+pl.xlabel('Time (ms)')
+pl.ylabel('Cai (mM)')
+
+# Plot of Steady-state subspace calcium
+pl.subplot(1,3,3)
+pl.plot(d['engine.time'], d['calcium.Ca_ss'])
+pl.xlim(0,600)
+pl.xlabel('Time (ms)')
+pl.ylabel('CaSS (mM)')
+pl.suptitle('Ten-Tusscher (2006)- Steady-state {} AP and [Ca], pre-paced for 50 cycles (Fig 2)'.format(cell_type))
+pl.show()
+
