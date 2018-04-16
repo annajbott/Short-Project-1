@@ -1,0 +1,92 @@
+[[protocol]]
+# Level  Start    Length   Period   Multiplier
+1        100       0.5      1000     0
+
+[[script]]
+import myokit
+import matplotlib.pyplot as pl
+
+### Ten-Tusscher S1-S2 protocol- Figure 5B ###
+### -------------------------------------- ###
+
+## 10 S1 beats at 600ms PCL, followed by single S2 beat with varying pacing 
+
+
+# Get the model and protocol, create a simulation
+m = myokit.load_model('tentusscher-2006.mmt')
+
+# Pacing for S1 beats is 600ms
+pcl = 600
+p = myokit.pacing.blocktrain(pcl, 0.5, offset=20, level=1.0, limit=0)
+s = myokit.Simulation(m, p, apd_var='membrane.V')
+
+#Pre pace 9 beats (10 s1 beats in total)
+s.pre(pcl * 9)
+
+# Setting a step size to increase pacing for S2 interval by
+step_size = 40
+
+# Final S1 beat and S2 beat, with APD 50 and APD 90
+
+# PCL = APD +DI
+pl.figure()
+# For loop for plotting APD 50% and APD 90%
+for percent in range(50,91,40):
+    di = []
+    apd_duration= []
+    pacing = 342
+    while pacing <1000:
+        print pacing
+        
+        # Final S1 beat
+        p = myokit.pacing.blocktrain(pcl, 0.5, offset=0, level=1.0, limit=1)
+        
+        # Introducing S2 upstroke. Offset by pacing interval
+        p.schedule(1, pacing,0.5, pcl, 1)
+        s = myokit.Simulation(m, p,apd_var='membrane.V')
+        
+        # APD threshold and running simulation
+        vt = 0.01*percent * s.state()[m.get('membrane.V').indice()]
+        d, apds = s.run(1800, apd_threshold=vt)
+        
+        # APD of final S1 beat
+        duration1 = apds['duration'][0]
+        
+        #APD duration of S2
+        duration2 = apds['duration'][1]
+        apd_duration.append(duration2)
+        
+        # DI = PCL - APD of previous beat
+        di.append(pacing - duration1)
+         
+        #Step size of pacing interval increase
+        pacing += step_size
+        
+        # Reset simulation settings to pre-pacing
+        s.reset()
+        
+    pl.plot(di, apd_duration)
+    pl.plot(di, apd_duration, 'x',label='_nolegend_')
+    
+# Plot S1S2 protocol restitution curve        
+
+pl.xlabel('Diastole interval (ms)')
+pl.ylabel('APD (ms)')
+pl.title('Ten-Tusscher (2006) 10 x S1, 1 x S2 Protocol Restitution Curve (Fig 5B)')
+pl.legend(['APD 50','APD 90'])
+pl.xlim(0,600)
+pl.show()
+# Parameters matching 2nd row table 2 ten-Tusscher model 2006 (should be slope of 1.1)
+
+#(y2-y1)/(x2-x1)
+max_grad = 0
+grad_list = []
+for i in range(1, len(apd_duration)):
+    y_dif = apd_duration[i]- apd_duration[i-1]
+    x_dif = di[i] - di[i-1]
+    grad = float(y_dif / x_dif)
+    grad_list.append(grad)
+    if grad > max_grad:
+        max_grad = grad
+print('Max slope', max_grad)
+
