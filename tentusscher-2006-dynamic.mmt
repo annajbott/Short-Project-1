@@ -1,0 +1,86 @@
+[[protocol]]
+# Level  Start    Length   Period   Multiplier
+1        100       0.5      1000     0
+
+[[script]]
+import myokit
+import matplotlib.pyplot as pl
+
+### Ten-Tusscher Dynamic Restitution Protocol- Figure 5F/J ###
+### ------------------------------------------------------ ###
+
+# Get the model
+m = myokit.load_model('tentusscher-2006.mmt')
+
+step_size = 30
+apd_duration = []
+di = []
+period = []
+pcl_list  = []
+
+pcl = 350
+while pcl < 950:
+    print pcl
+    
+    #Initialising protocol with new pacing
+    p = myokit.pacing.blocktrain(pcl, 0.5, offset=0, level=1.0, limit=0)
+    s = myokit.Simulation(m, p,apd_var='membrane.V')
+    
+    #Pre pacing for 48 beats, trying to settle to steady-state
+    s.pre(pcl * 48)
+    vt = 0.9 * s.state()[m.get('membrane.V').indice()]
+    
+    # Running for 2 cycles
+    d, apds = s.run(2*pcl, apd_threshold=vt)
+    
+    # Calulating APD for penultimate beat
+    duration0 = apds['duration'][0]
+    
+    # APD for final beat
+    duration1 = apds['duration'][1]
+    apd_duration.append(duration1)
+    
+    #DI equal to the pcl - APD of penultimate beat
+    DI = pcl - duration0
+    di.append(DI)
+    
+    # Pacing cycle length
+    period.append(pcl)
+    
+    # Resetting simulation to previous pre-beat
+    s.reset()
+    pcl += step_size
+    
+# Plotting APD vs DI for dynamic protocol
+pl.figure()
+pl.xlabel('Diastole interval (ms)')
+pl.ylabel('APD 90 (ms)')
+pl.title('Ten-Tusscher (2006)- Dynamic restitution curve (Fig. 5F)')
+pl.xlim(0,600)
+pl.plot(di, apd_duration)
+pl.plot(di, apd_duration, 'x')
+
+# Plotting APD vs Period for dynamic protocol
+pl.figure()
+pl.xlabel('Period (ms)')
+pl.ylabel('APD 90 (ms)')
+pl.title('Ten-Tusscher (2006)- Dynamic restitution curve (Fig. 5J)')
+pl.xlim(0,800)
+pl.ylim(100,325)
+pl.plot(period, apd_duration)
+pl.plot(period, apd_duration, 'x')
+
+pl.show()
+
+# Calculating gradients
+grad_list = []
+max_grad = 0
+for i in range(1, len(apd_duration)):
+    y_dif = apd_duration[i]- apd_duration[i-1]
+    x_dif = di[i] - di[i-1]
+    grad = float(y_dif / x_dif)
+    grad_list.append(grad)
+    if grad > max_grad:
+        max_grad = grad
+print('Max slope- dynamic', max_grad)
+
