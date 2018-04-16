@@ -1,0 +1,99 @@
+[[protocol]]
+# Level  Start    Length   Period   Multiplier
+1.0      20    0.5      1000.0   0
+
+[[script]]
+import matplotlib.pyplot as pl
+import myokit
+### Grandi (2010) ###
+### Recreating Figure 4 ###
+# Steady state epicardial AP, calcium transient and major ionic currents #
+# Simulated at 1Hz (1000ms PCL) 
+# Get model and protocol, create simulation
+
+
+# Loading model and protocol from original grandi model
+m = myokit.load_model('grandi-2010.mmt')
+p = myokit.load_protocol('grandi-2010.mmt')
+s = myokit.Simulation(m, p)
+
+modes = {
+    'Endocardial' : 0,
+    'Epicardial' : 1,
+    }
+    
+for name, mode in modes.iteritems():
+# Setting type of tissue, endocardial = 0, epicardial = 1
+    s.set_constant(var = 'type.epi', value = mode)
+    
+    #Pre pace for a specified number of beats
+    bcl = 1000
+    beats = 30
+    s.pre(bcl * beats)
+    
+    vt = 0.9 * s.state()[m.get('membrane.V').indice()]
+    # Run simulation
+    d = s.run(1000)
+    apds = d.apd(threshold=vt, v='membrane.V')
+    
+    
+    # Display the results
+    pl.figure()
+    pl.xlim(-10,500)
+    #pl.ylim(-100,40)
+    pl.subplot(6,2,1)
+    pl.plot(d['engine.time'], d['membrane.V'])
+    pl.xlim(-10,500)
+    pl.ylabel('Voltage (mV)')
+    pl.subplot(6,2,2)
+    pl.ylabel('IKr (A/F)')
+    pl.xlim(-10,500)
+    pl.plot(d['engine.time'], d['ikr.I_kr'])
+    pl.subplot(6,2,3)
+    pl.xlim(-10,500)
+    pl.plot(d['engine.time'], d['calcium.Ca_i'])
+    pl.ylabel('[Ca]i (mM)')
+    pl.subplot(6,2,4)
+    pl.xlim(-10,500)
+    pl.ylabel('IKs (A/F)')
+    pl.plot(d['engine.time'], d['iks.I_ks'])
+    pl.subplot(6,2,5)
+    pl.ylabel('[Ca]ct (mM)')
+    pl.xlim(-10,500)
+    pl.plot(d['engine.time'], d['calcium.Ca_j'])
+    pl.subplot(6,2,6)
+    pl.xlim(-10,500)
+    pl.ylabel('IKto (A/F)')
+    pl.plot(d['engine.time'], d['ito.I_tof'], label = 'Fast')
+    pl.plot(d['engine.time'], d['ito.I_tos'], label = 'Slow')
+    pl.legend(loc = 'upper right')
+    pl.subplot(6,2,7)
+    pl.xlim(-10,500)
+    pl.ylabel('[Ca]SL (mM)')
+    pl.plot(d['engine.time'], d['calcium.Ca_sl'])
+    pl.subplot(6,2,8)
+    pl.xlim(-10,500)
+    pl.ylabel('IK1 (A/F)')
+    pl.plot(d['engine.time'], d['ik1.I_k1'])
+    pl.subplot(6,2,9)
+    pl.xlim(-10,500)
+    pl.ylabel('INa (A/F)')
+    pl.plot(d['engine.time'], d['ina.I_Na_sl'])
+    pl.subplot(6,2,10)
+    pl.xlim(-10,500)
+    pl.ylabel('INCX (A/F)')
+    pl.plot(d['engine.time'], d['incx.I_ncx_sl'])# Not sure?????
+    pl.subplot(6,2,11)
+    pl.xlim(-10,500)
+    pl.xlabel('Time (ms)')
+    pl.ylabel('ICal (A/F)')
+    pl.plot(d['engine.time'], d['calcium.I_Ca_tot_junc'])
+    pl.subplot(6,2,12)
+    pl.xlim(-10,500)
+    pl.ylabel('INak (A/F)')
+    pl.xlabel('Time (ms)')
+    pl.plot(d['engine.time'], d['inak.I_nak_sl'])
+    pl.suptitle('Grandi (2010) {} AP and major ion currents, pre-paced for {} beats'.format(name,beats))
+    pl.show()
+    s.reset()
+
