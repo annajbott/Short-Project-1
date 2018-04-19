@@ -4,8 +4,8 @@ import matplotlib.pyplot as pl
 import myokit
 import numpy as np
 
-def ap_duration(s, bcl, paces):
-    d = s.run(paces*bcl )
+def ap_duration(d, paces, threshold):
+
     # Convert membrane potential and time arrays to numpy
     potential = np.asarray(d['membrane.V'])
     time = np.asarray(d['environment.time'])
@@ -22,22 +22,22 @@ def ap_duration(s, bcl, paces):
     responses = 0
     for i in range(0,len(potential)):
         # Start of AP (so not already in AP), greater than threshold
-        if potential[i] >= thresh and not in_ap:
+        if potential[i] >= threshold and not in_ap:
             in_ap = 1
             start_ap[responses] = time[i]
         # End of AP, record end time and subtract start for the duration
-        elif in_ap and potential[i] < thresh:
+        elif in_ap and potential[i] < threshold:
             in_ap = 0
             end_apd = time[i]
             duration_ap[responses] = end_apd - start_ap[responses]
             responses += 1
 
     # If simulation was started in the middle of an AP, discard first entry
-    if potential[0] > thresh:
+    if potential[0] > threshold:
         start_ap = start_ap[1:]
         duration_ap = duration_ap[1:]
     # If final AP not finished, discard its start time
-    if potential[-1] > thresh:
+    if potential[-1] > threshold:
         start_ap = start_ap[0:-1]
 
     # Keep only non-zero terms
@@ -50,29 +50,35 @@ def ap_duration(s, bcl, paces):
 
     return[start_ap, duration_ap]
 
-#Set pacing
-bcl = 50
+def main():
+    #Set pacing
+    bcl = 200
 
-# Load model and set protocol, create simulation
-m = myokit.load_model('ohara-cipa-v1-2017.mmt')
-p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=0)
-s = myokit.Simulation(m,p)
+    # Load model and set protocol, create simulation
+    m = myokit.load_model('ohara-cipa-v1-2017.mmt')
+    p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=0)
+    s = myokit.Simulation(m,p)
 
-# Set cell type
-cell_types = {'Endocardial' : 0, 'Epicardial' : 1, 'Mid-myocardial' : 2}
-cell_type =  'Epicardial'
-s.set_constant('cell.celltype', cell_types[cell_type])
+    # Set cell type
+    cell_types = {'Endocardial' : 0, 'Epicardial' : 1, 'Mid-myocardial' : 2}
+    cell_type =  'Epicardial'
+    s.set_constant('cell.celltype', cell_types[cell_type])
 
-# Pre-pace simulation to steady state and run 5 cycles of simulation
-s.pre(40*bcl)
+    # Pre-pace simulation to steady state and run 5 cycles of simulation
+    s.pre(400*bcl)
 
-# Set threshold, 90% of repolarisation to resting membrane potential
-thresh = 0.9 * s.state()[m.get('membrane.V').indice()]
+    # Set threshold, 90% of repolarisation to resting membrane potential
+    thresh = 0.9 * s.state()[m.get('membrane.V').indice()]
 
-# Run actual simulation to calculate APD for
-paces = 20
+    # Run actual simulation to calculate APD for
+    paces = 10
 
-# Running using function
-start, duration = ap_duration(s,bcl, paces)
-print start, duration
-pl.show()
+    d = s.run(paces*bcl )
+    # Running using function
+    start, duration = ap_duration(d, paces, thresh)
+    print start
+    print duration
+    pl.show()
+
+if __name__ == "__main__":
+    main()
