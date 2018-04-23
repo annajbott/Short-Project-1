@@ -65,16 +65,24 @@ def steady(m,p,pcl,paces):
 
     # Set repolarisation threshold to 90% and run APD function to get information
     # about when each AP starts
+
     thresh = 0.9 * s.state()[m.get('membrane.V').indice()]
     start, duration = ap_duration(d, paces, thresh)
 
+
     # If there is greater than a 1:1 ratio
     paces_per_period = np.round(float(start[-1] - start[-2]),0)/ float(pcl)
+
     # How many time points in each period (AP) (time interval for solver 0.1)
     time_points_per_period = pcl*paces_per_period/0.1
 
     # Convert membrane potential list into numpy array
     V = np.asarray(d['membrane.V'])
+    # Long-short pattern
+    if np.round(duration[-1],0) != np.round(duration[-2],0) and np.round(duration[-1],0) == np.round(duration[-3],0):
+        long_short = 1
+    else:
+        long_short = 0
 
     # If multiple paces per period, V may not be divisible by no. time_points_per_period
     # Slice the end of the array off so it is divisble and can reshape array
@@ -88,26 +96,29 @@ def steady(m,p,pcl,paces):
     V = np.reshape(V, (-1, int(time_points_per_period)))
 
     # Euclidean distance and percentage change between adjacent periods calculated
-    perc = np.zeros(len(V)-1)
+    perc = np.zeros(len(V)-1 - long_short)
+
     # Length V = number of rows --> number of APs (periods)
-    for i in range(1,len(V)):
-        dist = np.sqrt(np.sum((V[i]-V[i-1])**2))
-        perc[i-1] = (dist/abs(np.mean(V[i-1])))*100
+    for i in range(1 + long_short,len(V)):
+        dist = np.sqrt(np.sum((V[i]-V[i-1 - long_short])**2))
+        perc[i-1 - long_short] = (dist/abs(np.mean(V[i-1 - long_short])))*100
 
     # Moving average for 10 terms calculated for percentage change
     moving_av = np.convolve(perc, np.ones((10,))/10, mode='valid')
+    pl.figure()
+    pl.plot(d['environment.time'],d['membrane.V'])
 
     # Plot results
     pl.figure()
-    pl.plot(range(1,len(V)), perc)
+    pl.plot(range(1 + long_short,len(V)), perc)
     pl.xlabel('Period Number')
     pl.ylabel('Euclidean distance percentage change to previous period')
     pl.figure()
-    pl.plot(range(1,len(V)-9), moving_av)
+    pl.plot(range(1 + long_short,len(V)-9), moving_av)
     pl.xlabel('Period Number')
     pl.ylabel('Moving average')
-    print moving_av
-    if np.size(np.nonzero(moving_av < 1)) < 1:
+
+    if np.size(np.nonzero(moving_av < 1.5)) < 1:
         ss = "Run again with more paces"
     else:
         ss = paces_per_period*np.nonzero(moving_av < 1)[0][0]
@@ -115,7 +126,7 @@ def steady(m,p,pcl,paces):
 
 def main():
     #Set pacing
-    bcl = 600
+    bcl = 100
 
     # Load model and set protocol, create simulation
     m = myokit.load_model('ohara-cipa-v1-2017.mmt')
@@ -133,7 +144,7 @@ def main():
     # Set threshold, 90% of repolarisation to resting membrane potential
     thresh = 0.9 * s.state()[m.get('membrane.V').indice()]
 
-    ss = steady(m,p, pcl = 400, paces = 500)
+    ss = steady(m,p, bcl, paces = 2000)
     print ss
     #s = myokit.Simulation(m,p)
     #d = s.run(paces*bcl, log_interval = 0.1 )
