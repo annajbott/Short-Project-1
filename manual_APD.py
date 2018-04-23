@@ -50,24 +50,28 @@ def ap_duration(d, paces, threshold):
 
     return[start_ap, duration_ap]
 
-def steady(m,p,pcl):
+def steady(m,p,pcl,paces):
     s = myokit.Simulation(m,p)
-    paces = 100
-    print "hi"
+    print "In steady function"
     d  = s.run(paces*pcl, log_interval = 0.1)
-    print "been there"
+    print "Simulations finished running"
     thresh = 0.9 * s.state()[m.get('membrane.V').indice()]
     start, duration = ap_duration(d, paces, thresh)
 
     # If there is greater than a 1:1 ratio
     paces_per_period = np.round(float(start[-1] - start[-2]),0)/ float(pcl)
     time_points_per_period = pcl*paces_per_period/0.1
-
+    print time_points_per_period
     V = np.asarray(d['membrane.V'])
+    remainder = int(len(V)%time_points_per_period)
+    print remainder
+    if remainder != 0:
+        V = V[0:-remainder]
+    print len(V)
     V = np.reshape(V, (-1, int(time_points_per_period)))
 
     perc = np.zeros(paces-1)
-    for i in range(1,paces):
+    for i in range(1,len(V)):
         dist = np.sqrt(np.sum((V[i]-V[i-1])**2))
         perc[i-1] = abs((dist/np.mean(V[i]))*100)
 
@@ -77,8 +81,8 @@ def steady(m,p,pcl):
     pl.figure()
     pl.plot(range(1,paces-9), moving_av)
     pl.show()
-    ss = np.nonzero(moving_av < 2)[0][0]
-    print ss
+    ss = np.nonzero(moving_av < 1)[0][0]
+    return(ss)
 
 def main():
     #Set pacing
@@ -101,9 +105,10 @@ def main():
     thresh = 0.9 * s.state()[m.get('membrane.V').indice()]
 
     # Run actual simulation to calculate APD for
-    paces = 10
+    #paces = 10
 
-    steady(m,p, bcl)
+    ss = steady(m,p, pcl = 213, paces = 300)
+    print ss
     #s = myokit.Simulation(m,p)
     #d = s.run(paces*bcl, log_interval = 0.1 )
 
