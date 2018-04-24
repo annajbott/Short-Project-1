@@ -56,7 +56,7 @@ s = myokit.Simulation(m, p)
 d = s.run(offset)
 
 # Use ap_duration function to calculate start times and durations
-start, duration = ap_duration(d, paces*beats_per_pace,threshold)
+start, duration = ap_duration(d, paces*beats_per_pace)
 
 # First offset equal to zero, so remove first entry from the list
 offset_list = offset_list[1:]
@@ -64,14 +64,11 @@ offset_list = offset_list[1:]
 # Numpy array to contain final APD for each pacing cycle
 final_apd = np.zeros(len(offset_list) + 1)
 
-print offset_list
-print start
-
 # Fill final_apd array
 for i in range(len(offset_list)):
     # Final peak of pacing cycle = peak before the first of a new pacing cycle
-    # Index_start = The index of the start of pacing cycle in start array
 
+    # Index_start = The index of the start of pacing cycle in start array
     index_start = np.nonzero(np.round(start,0) >= offset_list[i])[0][0]
 
     # index_1 -1 to get peak at the end of the previous cycle
@@ -80,7 +77,14 @@ for i in range(len(offset_list)):
 # The final peak doesn't have a peak after it, so can be indexed by the final duration recorded
 final_apd[-1] = duration[-1]
 
+pl.figure()
+pl.plot(d['engine.time'], d['membrane.V'])
+
+
 # Plot the restitution curve
 pl.figure()
 pl.plot(period, final_apd, 'x')
+pl.xlabel('Period (ms)')
+pl.ylabel('APD 90 (ms)')
+pl.title('Dynamic Restitution Curve- Epithelial Cells (Ten-Tusscher 2006)')
 pl.show()
