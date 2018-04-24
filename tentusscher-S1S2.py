@@ -44,15 +44,12 @@ for percent in range(50,91,40):
         p.schedule(1, pacing,0.5, pcl, 1)
         s = myokit.Simulation(m, p,apd_var='membrane.V')
 
-        # Set threshold, 90% of repolarisation to resting membrane potential
-        thresh = 0.01*percent * s.state()[m.get('membrane.V').indice()]
-
         # Run actual simulation to calculate APD for
         paces = 5
         d = s.run(paces*pcl)
 
-        # Running using function
-        start, duration = ap_duration(d, paces, thresh)
+        # Run using function.
+        start, duration = ap_duration(d, paces, repolarisation = percent)
 
         # Storing apd and DI for this pacing length
         apd_duration.append(duration[1])
@@ -74,4 +71,5 @@ pl.title('Ten-Tusscher (2006) {} Cell 10 x S1, 1 x S2 Protocol Restitution Curve
 pl.legend(['APD 50','APD 90'])
 pl.xlim(0,600)
 pl.show()
+
 # Parameters matching 2nd row table 2 ten-Tusscher model 2006 (should be slope of 1.1)
