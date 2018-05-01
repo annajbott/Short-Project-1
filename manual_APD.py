@@ -9,7 +9,7 @@ def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
     # Convert membrane potential and time lists to numpy arrays
     V = np.asarray(d['membrane.V'])
     # Depending on model, sometimes environment.time, others engine.time
-    time = np.asarray(d['environment.time'])
+    time = np.asarray(d['engine.time'])
 
     # Blank numpy arrays to contain resting values, max peaks for each AP
     # Times of peaks, duration of APs and start of AP above some threshold
@@ -59,8 +59,10 @@ def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
         elif V[i-1] < current_resting_value and flat_bit_found == 0 and not in_ap:
             current_resting_value = V[i-1]
 
-        ## Crossing threshold. Start of AP ##
+        ### Crossing threshold. Start of AP ###
         if V[i] > AP_threshold and V[i-1] <= AP_threshold and not in_ap:
+
+            # Now within AP
             in_ap = 1
 
             # Set resting value for this AP. Used as minimum
@@ -82,11 +84,6 @@ def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
             current_peak = V[i]
             current_peak_time = time[i]
 
-        #if prev_voltage_grad <= 0 and voltage_grad > 0 and not switching_phase:
-
-
-        #switching_phase = False
-
         # Cross threshold again. End of AP. Update variables
         elif in_ap and V[i] < AP_threshold and V[i-1] >= AP_threshold:
 
@@ -105,9 +102,6 @@ def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
             max_upstroke_velocity = -inf
             current_peak = AP_threshold
             current_time_of_upstroke_velocity = 0.0
-
-        # Record previous voltage
-        prev_voltage_grad = voltage_grad
 
         # Loop round to next time point
 
@@ -129,7 +123,6 @@ def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
         custom_thresh = resting_values[ap_index] + 0.01*(100-repolarisation)*(peak_values[ap_index]-resting_values[ap_index])
 
         starting_time_index = np.nonzero(time > onset[ap_index])[0][0] - 1
-        #print starting_time_index
 
         # The APD 90/50.. threshold is greater than earlier threshold
         # Look forwards in time
@@ -195,7 +188,7 @@ def steady(m,p,pcl,paces):
     print "In steady function"
 
     # Run for pcl*paces, specifying to use time values every 0.1 ms interval for solver
-    d  = s.run(paces*pcl, log = ['environment.time', 'membrane.V'], log_interval = 0.1)
+    d  = s.run(paces*pcl, log = ['engine.time', 'membrane.V'], log_interval = 0.1)
 
     # Lengthy step due to log_interval component, so progress report when this is finished
     print "Simulations finished running"
@@ -251,7 +244,7 @@ def steady(m,p,pcl,paces):
     #moving_av = np.convolve(perc, np.ones((10,))/10, mode='valid')
     moving_av_dist = np.convolve(dist_array, np.ones((10,))/10, mode='valid')
     pl.figure()
-    pl.plot(d['environment.time'],d['membrane.V'])
+    pl.plot(d['engine.time'],d['membrane.V'])
 
     # Plot results
     pl.figure()
@@ -262,7 +255,8 @@ def steady(m,p,pcl,paces):
     if np.size(np.nonzero(moving_av_dist < 0.5)) < 1:
         ss =  "Run again with more paces"
     else:
-        ss = paces_per_period*np.nonzero(moving_av_dist < 0.8)[0][0]
+        ss = paces_per_period*np.nonzero(moving_av_dist < 0.4)[0][0]
+
     return(ss)
 
 def main():
@@ -284,7 +278,7 @@ def main():
     ### Testing APD calc section ###
     ### ------------------------ ###
     # Pre-pace simulation and run 30 cycles of simulation
-    '''
+    #'''
     s.pre(200*bcl)
     # Running using function
     paces = 10
@@ -293,14 +287,14 @@ def main():
     print start
     print duration
     pl.figure()
-    pl.plot(d['environment.time'], d['membrane.V'])
+    pl.plot(d['engine.time'], d['membrane.V'])
 
     '''
     ### Testing steady state calc ###
     ### ------------------------- ###
     ss = steady(m,p, bcl, paces = 300)
     print ss
-    #'''
+    '''
     pl.show()
 if __name__ == "__main__":
     main()
