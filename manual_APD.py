@@ -116,12 +116,13 @@ def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
 
     # Clone onset matrix, to fill with APD (90/50 etc) starts
     onset_apd = onset
+    thresh = []
 
     # Iterating over APs rather than time points
     for ap_index in range(0, len(peak_values)):
         # Custom threshold for each AP. Range*(100-repolarisation %) + resting value
         custom_thresh = resting_values[ap_index] + 0.01*(100-repolarisation)*(peak_values[ap_index]-resting_values[ap_index])
-
+        thresh.append(custom_thresh)
         starting_time_index = np.nonzero(time > onset[ap_index])[0][0] - 1
 
         # The APD 90/50.. threshold is greater than earlier threshold
@@ -178,7 +179,7 @@ def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
         # Loop to next AP
 
     duration_ap = duration_ap[np.nonzero(duration_ap)]
-    return[onset_apd, duration_ap]
+    return[onset_apd, duration_ap, thresh]
 
 def steady(m,p,pcl,paces):
     # Create simulation using user defined model and protocol
@@ -260,6 +261,44 @@ def steady(m,p,pcl,paces):
     return(ss)
 
 def main():
+    ### Testing APD calc section ###
+    ### ------------------------ ###
+    # Pre-pace simulation and run 30 cycles of simulation
+    # Load model and set protocol, create simulation
+    m = myokit.load_model('ohara-cipa-v1-2017.mmt')
+    p = myokit.Protocol()
+    s = myokit.Simulation(m,p)
+
+    # Set cell type
+    cell_types = {'Endocardial' : 0, 'Epicardial' : 1, 'Mid-myocardial' : 2}
+    cell_type =  'Epicardial'
+    s.set_constant('cell.celltype', cell_types[cell_type])
+
+    for pacing in range(100,400,50):
+      bcl = pacing
+      p = myokit.Protocol()
+      p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=0)
+      s.set_protocol(p)
+      s.pre(200*bcl)
+      # Running using function
+      paces = 5
+      d = s.run(paces*bcl)
+      start, duration, thresh = ap_duration(d, paces)
+      pl.figure()
+      pl.plot(d['engine.time'], d['membrane.V'])
+      if len(start) > len(duration):
+          start = start[0:-1]
+      for i, start in enumerate(start):
+          duration_ap = duration[i]
+          pl.arrow(start, thresh[i], duration_ap, 0, head_width=5, head_length=100,
+              length_includes_head=True)
+          pl.text(start + 40, -90, str(int(duration_ap)) + ' ms')
+
+      s.reset()
+    pl.show()
+
+
+    '''
     ## Initialisation common to steady and APD calc ##
     # Set pacing
     bcl = 150
@@ -274,22 +313,6 @@ def main():
     cell_type =  'Epicardial'
     s.set_constant('cell.celltype', cell_types[cell_type])
 
-
-    ### Testing APD calc section ###
-    ### ------------------------ ###
-    # Pre-pace simulation and run 30 cycles of simulation
-    #'''
-    s.pre(200*bcl)
-    # Running using function
-    paces = 10
-    d = s.run(paces*bcl)
-    start, duration = ap_duration(d, paces)
-    print start
-    print duration
-    pl.figure()
-    pl.plot(d['engine.time'], d['membrane.V'])
-
-    '''
     ### Testing steady state calc ###
     ### ------------------------- ###
     ss = steady(m,p, bcl, paces = 300)
