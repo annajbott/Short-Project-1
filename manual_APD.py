@@ -14,11 +14,11 @@ def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
     # Blank numpy arrays to contain resting values, max peaks for each AP
     # Times of peaks, duration of APs and start of AP above some threshold
     # Assuming no 1:2 (or 1:3 etc.) ratios, so number of paces >= number of APs
-    resting_values = np.zeros(paces + 2)
-    peak_values = np.zeros(paces + 2)
-    time_of_peak_values = np.zeros(paces + 2)
-    onset = np.zeros(paces + 2) # Plus 2 in case starts mid AP and ends with incomplete AP
-    duration_ap = np.zeros(paces + 2)
+    resting_values = np.zeros(2*paces + 2)
+    peak_values = np.zeros(2*paces + 2)
+    time_of_peak_values = np.zeros(2*paces + 2)
+    onset = np.zeros(2*paces + 2) # Plus 2 in case starts mid AP and ends with incomplete AP
+    duration_ap = np.zeros(2*paces + 2)
 
     # Segmenting each period using the minimum voltage + 5mV as threshold
     AP_threshold = min(V) + 5
@@ -184,79 +184,97 @@ def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
 def steady(m,p,pcl,paces):
     # Create simulation using user defined model and protocol
     s = myokit.Simulation(m,p)
+    ss = 0
+    count = 0
+    while ss == 0:
+        # Progress report
+        print "In steady function"
 
-    # Progress report
-    print "In steady function"
+        # Run for pcl*paces, specifying to use time values every 0.1 ms interval for solver
+        d  = s.run(paces*pcl, log = ['engine.time', 'membrane.V'], log_interval = 0.1)
 
-    # Run for pcl*paces, specifying to use time values every 0.1 ms interval for solver
-    d  = s.run(paces*pcl, log = ['engine.time', 'membrane.V'], log_interval = 0.1)
+        # Lengthy step due to log_interval component, so progress report when this is finished
+        print "Simulations finished running"
 
-    # Lengthy step due to log_interval component, so progress report when this is finished
-    print "Simulations finished running"
+        # Use function to calculate start and AP duration, default APD 90
+        start, duration, thresh = ap_duration(d, paces)
+        min = float("inf")
+        # Find long-short patterns. Linearly repeating
 
-    # Use function to calculate start and AP duration, default APD 90
-    start, duration = ap_duration(d, paces)
+        for i in range(1, 10):
+            #if np.round(duration[-1],0) != np.round(duration[-1 - i],0):
+            #    continue
+            #else:
+            #    seq = i
+            #    print seq
+            #    break
 
-    # Find long-short patterns. Linearly repeating
-    for i in range(1, 10):
-        if np.round(duration[-1],0) != np.round(duration[-1 - i],0):
-            continue
+            if abs(duration[-1] - duration[-1-i]) < min:
+                min  = abs(duration[-1] - duration[-1-i])
+                seq = i
+            else:
+                continue
+
+
+        print seq
+        # If there is greater than a 1:1 ratio
+        paces_per_period = np.round(float(start[-1] - start[-2])/ float(pcl),0)
+        print paces_per_period
+        # How many time points in each period (AP) (time interval for solver 0.1)
+        time_points_per_period = pcl*paces_per_period/0.1
+
+        # Convert membrane potential list into numpy array
+        V = np.asarray(d['membrane.V'])
+
+        # If multiple paces per period, V may not be divisible by no. time_points_per_period
+        # Slice the end of the array off so it is divisble and can reshape array
+        remainder = int(len(V)%time_points_per_period)
+
+        if remainder != 0:
+            V = V[0:-remainder]
+
+        # Reshape array so that each period is on a seperate row
+        # Each column contains the same point in an AP, but for different beats
+        V = np.reshape(V, (-1, int(time_points_per_period)))
+
+        # Euclidean distance and percentage change between adjacent periods calculated
+        perc = np.zeros(len(V)-seq)
+        dist_array = np.zeros(len(V)-seq)
+
+        # Length V = number of rows --> number of APs (periods)
+        for i in range(seq,len(V)):
+            dist_av = 0
+            for j in range(1,10):
+                # L-infinte
+                dist = max(abs(V[i]-V[i-j*seq]))
+                dist_av += dist
+                # Euclidean dist
+                #dist = np.sqrt(np.sum((V[i]-V[i-seq])**2))
+
+            dist_av = dist_av / j
+
+            #perc[i-seq] = (dist/abs(np.mean(V[i-seq])))*100
+            dist_array[i- seq] = dist_av
+        # Moving average for 10 terms calculated for percentage change
+        #moving_av = np.convolve(perc, np.ones((10,))/10, mode='valid')
+        moving_av_dist = np.convolve(dist_array, np.ones((10,))/10, mode='valid')
+        #pl.figure()
+        #pl.plot(d['engine.time'],d['membrane.V'])
+
+
+        # Plot results
+        #pl.figure()
+        #pl.plot(range(seq,len(V)), dist_array)
+        #pl.xlabel('Period Number')
+        #pl.ylabel("L-infinite norm of membrane potential and previous period's membrane potential")
+
+        if np.size(np.nonzero(dist_array < 0.3)) < 1:
+            ss =  0
+            count += paces
+            print count
+
         else:
-            seq = i
-            print seq
-            break
-
-    # If there is greater than a 1:1 ratio
-    paces_per_period = np.round(float(start[-1] - start[-2]),0)/ float(pcl)
-
-    # How many time points in each period (AP) (time interval for solver 0.1)
-    time_points_per_period = pcl*paces_per_period/0.1
-
-    # Convert membrane potential list into numpy array
-    V = np.asarray(d['membrane.V'])
-
-    # If multiple paces per period, V may not be divisible by no. time_points_per_period
-    # Slice the end of the array off so it is divisble and can reshape array
-    remainder = int(len(V)%time_points_per_period)
-
-    if remainder != 0:
-        V = V[0:-remainder]
-
-    # Reshape array so that each period is on a seperate row
-    # Each column contains the same point in an AP, but for different beats
-    V = np.reshape(V, (-1, int(time_points_per_period)))
-
-    # Euclidean distance and percentage change between adjacent periods calculated
-    perc = np.zeros(len(V)-seq)
-    dist_array = np.zeros(len(V)-seq)
-
-    # Length V = number of rows --> number of APs (periods)
-    for i in range(seq,len(V)):
-        # Euclidean dist
-        #dist = np.sqrt(np.sum((V[i]-V[i-seq])**2))
-
-        # L-infinite
-        dist = max(abs(V[i]-V[i-seq]))
-
-
-        #perc[i-seq] = (dist/abs(np.mean(V[i-seq])))*100
-        dist_array[i- seq] = dist
-    # Moving average for 10 terms calculated for percentage change
-    #moving_av = np.convolve(perc, np.ones((10,))/10, mode='valid')
-    moving_av_dist = np.convolve(dist_array, np.ones((10,))/10, mode='valid')
-    pl.figure()
-    pl.plot(d['engine.time'],d['membrane.V'])
-
-    # Plot results
-    pl.figure()
-    pl.plot(range(seq,len(V)), dist_array)
-    pl.xlabel('Period Number')
-    pl.ylabel("L-infinite norm of membrane potential and previous period's membrane potential")
-
-    if np.size(np.nonzero(moving_av_dist < 0.5)) < 1:
-        ss =  "Run again with more paces"
-    else:
-        ss = paces_per_period*np.nonzero(moving_av_dist < 0.4)[0][0]
+            ss = paces_per_period*np.nonzero(dist_array < 0.3)[0][0] + count
 
     return(ss)
 
@@ -273,7 +291,7 @@ def main():
     cell_types = {'Endocardial' : 0, 'Epicardial' : 1, 'Mid-myocardial' : 2}
     cell_type =  'Epicardial'
     s.set_constant('cell.celltype', cell_types[cell_type])
-
+    '''
     for pacing in range(100,400,50):
       bcl = pacing
       p = myokit.Protocol()
@@ -301,23 +319,32 @@ def main():
     '''
     ## Initialisation common to steady and APD calc ##
     # Set pacing
-    bcl = 150
+
 
     # Load model and set protocol, create simulation
     m = myokit.load_model('ohara-cipa-v1-2017.mmt')
-    p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=0)
+    p = myokit.Protocol()
     s = myokit.Simulation(m,p)
 
     # Set cell type
     cell_types = {'Endocardial' : 0, 'Epicardial' : 1, 'Mid-myocardial' : 2}
     cell_type =  'Epicardial'
     s.set_constant('cell.celltype', cell_types[cell_type])
-
-    ### Testing steady state calc ###
-    ### ------------------------- ###
-    ss = steady(m,p, bcl, paces = 300)
-    print ss
-    '''
+    sss = []
+    for bcl in range(100,450, 25):
+        p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=0)
+        s.set_protocol(p)
+        print bcl
+        ### Testing steady state calc ###
+        ### ------------------------- ###
+        ss = steady(m,p, bcl, paces = 300)
+        sss.append(ss)
+    pl.figure()
+    pl.plot(range(100,450, 25), sss,'x')
+    pl.plot(range(100,450, 25), sss)
+    pl.title('Number of paces taken to reach periodic orbit')
+    pl.xlabel('Pacing cycle length (ms)')
+    pl.ylabel('Number of paces')
     pl.show()
 if __name__ == "__main__":
     main()
