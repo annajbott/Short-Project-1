@@ -99,34 +99,83 @@ def GPB_HF_Gomez():
 
     return(m)
 
-## Set-up simulation and run
-bcl = 600
-paces = 5
-# Load model and set protocol
 
-p = myokit.pacing.blocktrain(bcl, 0.5, offset=20, level=1.0, limit=0)
+def main():
+    ## Basic cycle length and number of paces to run for
+    bcl = 1000
+    paces = 1
 
-# Use function to set parameters
-#m = Ord_HF_Gomez()
-m = GPB_HF_Gomez()
-s = myokit.Simulation(m,p)
+    # Set protocol
+    p = myokit.pacing.blocktrain(bcl, 0.5, offset=100, level=1.0, limit=0)
 
-# Set cell type
-cell_types = {'Endocardial' : 0, 'Epicardial' : 1, 'Mid-myocardial' : 2}
-cell_type =  'Epicardial'
-s.set_constant('type.epi', cell_types[cell_type])
-s.pre(200*bcl)
-d = s.run(paces*bcl)
-pl.figure()
-pl.plot(d['engine.time'],d['membrane.V'])
+    ## Grandi model ##
+    ## ------------ ##
+
+    # Set cell type
+    cell_types = {'Endocardial' : 0, 'Epicardial' : 1} #'Mid-myocardial' : 2}
+
+    pl.figure()
+    for i, cell_type in enumerate(cell_types):
+        m = myokit.load_model('grandi-2010.mmt')
+        s = myokit.Simulation(m,p)
+
+        s.set_constant('type.epi', cell_types[cell_type])
+        s.pre(200*bcl)
+        d = s.run(paces*bcl)
+        pl.subplot(1, 2, cell_types[cell_type] + 1)
+        pl.plot(d['engine.time'],d['membrane.V'])
+
+        # Use Function to set parameters
+        m = GPB_HF_Gomez()
+        s = myokit.Simulation(m,p)
+
+        s.set_constant('type.epi', cell_types[cell_type])
+        s.pre(200*bcl)
+        d1 = s.run(paces*bcl)
+        pl.plot(d1['engine.time'],d1['membrane.V'])
+        pl.legend(['Normal','HF '] )
+        pl.ylabel('Membrane Potential (mV)')
+        pl.xlabel('Time (ms)')
+        pl.title("{} cell".format(cell_type))
+    pl.suptitle("Grandi (2010) model at {} ms pace cycle length".format(bcl))
+
+    ## O'hara model ##
+    ## ------------ ##
+
+    # Set cell type
+    cell_types = {'Endocardial' : 0, 'Epicardial' : 1, 'Mid-myocardial' : 2}
+
+    pl.figure()
+    for i, cell_type in enumerate(cell_types):
+        m = myokit.load_model('ohara-2011.mmt')
+        s = myokit.Simulation(m,p)
+
+        s.set_constant('cell.mode', cell_types[cell_type])
+        s.pre(200*bcl)
+        d = s.run(paces*bcl)
+        start, duration, thresh = ap_duration(d, paces)
+        pl.subplot(1, 3, cell_types[cell_type] + 1)
+        pl.plot(d['engine.time'],d['membrane.V'])
+        pl.text(500,0,"Healthy APD- {} ms".format(np.round(duration[0],2)))
 
 
-m = myokit.load_model('grandi-2010.mmt')
-s = myokit.Simulation(m,p)
-#s.set_constant('cell.mode', cell_types[cell_type])
-s.set_constant('type.epi', cell_types[cell_type])
-s.pre(200*bcl)
-d1 = s.run(paces*bcl)
-pl.plot(d1['engine.time'],d1['membrane.V'])
-pl.legend(['HF {} cell'.format(cell_type),'Normal {} cell'.format(cell_type)] )
-pl.show()
+        # Use Function to set parameters
+        m = Ord_HF_Gomez()
+        s = myokit.Simulation(m,p)
+
+        s.set_constant('cell.mode', cell_types[cell_type])
+        s.pre(200*bcl)
+        d1 = s.run(paces*bcl)
+        start, duration_hf, thresh = ap_duration(d1, paces)
+        pl.plot(d1['engine.time'],d1['membrane.V'])
+        pl.text(500,-5,"HF APD- {} ms".format(np.round(duration_hf[0],2)))
+        pl.legend(['Normal','HF '] )
+        pl.ylabel('Membrane Potential (mV)')
+        pl.xlabel('Time (ms)')
+        pl.title("{} cell".format(cell_type))
+    pl.ylim(-93, 48)
+    pl.suptitle("O'hara (2011) model at {} ms pace cycle length".format(bcl))
+    pl.show()
+
+if __name__ == "__main__":
+    main()
