@@ -258,15 +258,15 @@ def steady(m,p,pcl,paces):
         # Moving average for 10 terms calculated for percentage change
         #moving_av = np.convolve(perc, np.ones((10,))/10, mode='valid')
         moving_av_dist = np.convolve(dist_array, np.ones((10,))/10, mode='valid')
-        #pl.figure()
-        #pl.plot(d['engine.time'],d['membrane.V'])
+        pl.figure()
+        pl.plot(d['engine.time'],d['membrane.V'])
 
 
         # Plot results
-        #pl.figure()
-        #pl.plot(range(seq,len(V)), dist_array)
-        #pl.xlabel('Period Number')
-        #pl.ylabel("L-infinite norm of membrane potential and previous period's membrane potential")
+        pl.figure()
+        pl.plot(range(seq,len(V)), dist_array)
+        pl.xlabel('Period Number')
+        pl.ylabel("L-infinite norm of membrane potential and previous period's membrane potential")
 
         if np.size(np.nonzero(dist_array < 0.3)) < 1:
             ss =  0
@@ -279,6 +279,7 @@ def steady(m,p,pcl,paces):
     return(ss)
 
 def main():
+    '''
     ### Testing APD calc section ###
     ### ------------------------ ###
     # Pre-pace simulation and run 30 cycles of simulation
@@ -291,19 +292,20 @@ def main():
     cell_types = {'Endocardial' : 0, 'Epicardial' : 1, 'Mid-myocardial' : 2}
     cell_type =  'Epicardial'
     s.set_constant('cell.celltype', cell_types[cell_type])
-    '''
+
     for pacing in range(100,400,50):
       bcl = pacing
       p = myokit.Protocol()
       p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=0)
       s.set_protocol(p)
-      s.pre(200*bcl)
+      #s.pre(200*bcl)
       # Running using function
       paces = 5
       d = s.run(paces*bcl)
       start, duration, thresh = ap_duration(d, paces)
       pl.figure()
       pl.plot(d['engine.time'], d['membrane.V'])
+      pl.title('Ohara-Rudy-CIPA (2017) Epicardial cell at {} pace cycle length'.format(pacing))
       if len(start) > len(duration):
           start = start[0:-1]
       for i, start in enumerate(start):
@@ -331,7 +333,7 @@ def main():
     cell_type =  'Epicardial'
     s.set_constant('cell.celltype', cell_types[cell_type])
     sss = []
-    for bcl in range(100,450, 25):
+    for bcl in range(300,325, 25):
         p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=0)
         s.set_protocol(p)
         print bcl
@@ -339,12 +341,13 @@ def main():
         ### ------------------------- ###
         ss = steady(m,p, bcl, paces = 300)
         sss.append(ss)
-    pl.figure()
-    pl.plot(range(100,450, 25), sss,'x')
-    pl.plot(range(100,450, 25), sss)
-    pl.title('Number of paces taken to reach periodic orbit')
-    pl.xlabel('Pacing cycle length (ms)')
-    pl.ylabel('Number of paces')
+    #pl.figure()
+    #pl.plot(range(100,450, 25), sss,'x')
+    #pl.plot(range(100,450, 25), sss)
+    #pl.title('Number of paces taken to reach periodic orbit')
+    #pl.xlabel('Pacing cycle length (ms)')
+    #pl.ylabel('Number of paces')
     pl.show()
+
 if __name__ == "__main__":
     main()
