@@ -20,95 +20,68 @@ cell_types = {'Endocardial': 0, 'Epicardial' : 1}
 cell_type = 'Endocardial'
 
 # Empty arrays to fill.
-period = []
-di = []
-offset_list = []
 
+offset_list = []
+pcl = 600
+p = myokit.pacing.blocktrain(pcl, 0.5, offset=20, level=1.0, limit=0)
+s = myokit.Simulation(m,p)
+s.pre(200*pcl)
 p = myokit.Protocol()
-offset = 0
-# More points around high pacing, more likely to see graph bifurcate
-pacing_list = [230,250,270,290,310,335,350,390,430,470,510,550,590,670,750,830,950,1000, 1400, 1600][::-1]
-# Starting at low frequency pacing (1Hz), 30 seconds at each pacing and then moving towards 230ms
-for pacing in pacing_list:
-    beats_per_pace = 100
-    p.schedule(1,start = offset, duration =0.5, period = pacing, multiplier = beats_per_pace)
+offset = 20
+
+interval = [300,310,350,390,430,470,510,550,590,670,750,830,950,1000,1100,1250,1400,1500, 1600][::-1]
+for lag in interval:
+    beats_per_pace = 20
+    p.schedule(1,start = offset, duration =0.5, period = pcl, multiplier = beats_per_pace)
     offset_list.append(offset)
-    # Next set of pacing events to be scheduled by this offset (beats per pace * pace)
-    offset += beats_per_pace*pacing
-    period.append(pacing)
+    # Next set of lag events to be scheduled by this offset (beats per pace * pace)
+    offset += (beats_per_pace-1)*pcl + lag
+
 
 
 # Set up simulation using this scheduled protocol
-s = myokit.Simulation(m, p)
+s.set_protocol(p)
 s.set_constant('type.epi', cell_types[cell_type])
 # Run the simulation with final offset value, equal to time passed for whole protocol
 d = s.run(offset, log = ['membrane.V','engine.time'])
 print 'finished running'
 
 # Use ap_duration function to calculate start times and durations
-start, duration, thresh = ap_duration(d, beats_per_pace*len(pacing_list))
+start, duration, thresh = ap_duration(d, beats_per_pace*len(interval))
 print 'apd calculated'
 
 # First offset equal to zero, so remove first entry from the list
 offset_list = offset_list[1:]
-print offset_list
-print start
 
-# Numpy array to contain final APD for each pacing cycle
+# Numpy array to contain final APD for each lag cycle
 final_apd = np.zeros(len(offset_list) + 1)
-final_apd2 = np.zeros(len(offset_list) + 1)
-final_apd3 = np.zeros(len(offset_list) + 1)
-final_apd4 = np.zeros(len(offset_list) + 1)
-di2 = []
-di3 = []
-di4 = []
 
+index_start_list = []
 # Fill final_apd array
 for i in range(len(offset_list)):
-    # Final peak of pacing cycle = peak before the first of a new pacing cycle
+    # Final peak of lag cycle = peak before the first of a new lag cycle
 
-    # Index_start = The index of the start of pacing cycle in start array
+    # Index_start = The index of the start of lag cycle in start array
     index_start = np.nonzero(start >= offset_list[i])[0][0]
-
+    index_start_list.append(index_start)
     # index_1 -1 to get peak at the end of the previous cycle
-    final_apd[i] = duration[index_start-1]
-    final_apd2[i] = duration[index_start - 2]
-    final_apd3[i] = duration[index_start - 3]
-    final_apd4[i] = duration[index_start - 4]
-    di.append(period[i]-duration[index_start -2])
-    di2.append(period[i]-duration[index_start -3])
-    di3.append(period[i]-duration[index_start -4])
-    di4.append(period[i]-duration[index_start -5])
+    final_apd[i] = duration[index_start]
 
 # The final peak doesn't have a peak after it, so can be indexed by the final duration recorded
 final_apd[-1] = duration[-1]
-di.append(period[-1] - duration[-2])
-
-# If the graph has a long-short pattern, take previous APD and DI as well
-final_apd2[-1] = duration[-2]
-di2.append(period[-1] - duration[-3])
-final_apd3[-1] = duration[-2]
-di3.append(period[-1] - duration[-3])
-final_apd4[-1] = duration[-2]
-di4.append(period[-1] - duration[-3])
 
 
 pl.figure()
 pl.plot(d['engine.time'],d['membrane.V'])
+for i, in_start in enumerate(index_start_list):
+    pl.arrow(start[in_start], -80, final_apd[i], 0, head_width=5, head_length=100,
+    length_includes_head=True, color = 'cyan')
 
 # Plot the restitution curve
 pl.figure()
-pl.plot(pacing_list, final_apd, 'x', c = 'b')
-#pl.plot(pacing_list,final_apd2,'x', c = 'b')
-#pl.plot(pacing_list,final_apd3,'x', c = 'b')
-#pl.plot(pacing_list,final_apd4,'x', c = 'b')
-#pl.xlabel('PCL (ms)')
-#pl.plot(di, final_apd, 'x', c = 'b')
-#pl.plot(di2,final_apd2,'x', c = 'b')
-#pl.plot(di3,final_apd3,'x', c = 'b')
-#pl.plot(di4,final_apd4,'x', c = 'b')
-#pl.xlabel('DI (ms)')
-
+pl.plot(interval, final_apd, 'x', c = 'b')
+pl.xlabel('Extrastimulus interval (ms)')
 pl.ylabel('APD 90 (ms)')
+pl.ylim(200,350)
 pl.title('Dynamic Restitution Curve- Grandi (2010)')
 pl.show()
