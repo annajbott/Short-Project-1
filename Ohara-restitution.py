@@ -7,7 +7,7 @@ from HF_model import Ord_HF_Gomez
 
 ## O'hara Restitution
 ## S1S2 steady state S1 pacing at 1000ms, single
-
+'''
 # Using APD 90 for final S1 AP to calculate DI
 percent = 90
 bcl = 1000
@@ -82,10 +82,12 @@ pl.show()
 
 ### Dynamic Protocol ###
 ### ---------------- ###
+
 m = myokit.load_model('ohara-2011.mmt')
 HF = False
 if HF:
     m = Ord_HF_Gomez()
+
 # Set cell type
 cell_types = {'Endocardial': 0, 'Epicardial' : 1, 'Mid-myocardial' : 2}
 cell_type = 'Endocardial'
@@ -95,14 +97,16 @@ period = []
 di = []
 offset_list = []
 
+# Clearing the protocol
 p = myokit.Protocol()
 offset = 0
 # More points around high pacing, more likely to see graph bifurcate
-pacing_list = [90,120,150,180,200,230,250,270,290,310,335,350,390,430,470,510,550,590,670,710,750,830,910,950,1000][::-1]
+pacing_list = np.logspace(2,3, num = 30, base = 10.0)[::-1]
+pacing_list = [int(i) for i in pacing_list]
 # Starting at low frequency pacing (1Hz), 30 seconds at each pacing and then moving towards 230ms
 for pacing in pacing_list:
     beats_per_pace = 30000/pacing
-    p.schedule(1,start = offset, duration =0.5, period = pacing, multiplier = beats_per_pace)
+    p.schedule(1, start = offset, duration =0.5, period = pacing, multiplier = beats_per_pace)
     offset_list.append(offset)
     # Next set of pacing events to be scheduled by this offset (beats per pace * pace)
     offset += beats_per_pace*pacing
@@ -121,10 +125,8 @@ start, duration, thresh = ap_duration(d, 30000*len(pacing_list), repolarisation 
 
 # First offset equal to zero, so remove first entry from the list
 offset_list = offset_list[1:]
-print offset_list
-print start
 
-# Numpy array to contain final APD for each pacing cycle
+# Numpy array to contain final APD for each pacing cycle (and 3 previous APs in case of alternans)
 final_apd = np.zeros(len(offset_list) + 1)
 final_apd2 = np.zeros(len(offset_list) + 1)
 final_apd3 = np.zeros(len(offset_list) + 1)
@@ -154,7 +156,7 @@ for i in range(len(offset_list)):
 final_apd[-1] = duration[-1]
 di.append(period[-1] - duration[-2])
 
-# If the graph has a long-short pattern, take previous APD and DI as well
+# If the graph has a long-short pattern, take previous APDs and DIs as well
 final_apd2[-1] = duration[-2]
 di2.append(period[-1] - duration[-3])
 final_apd3[-1] = duration[-2]
@@ -175,13 +177,17 @@ pl.plot(pacing_list,final_apd2,'x', c = 'b')
 pl.plot(pacing_list,final_apd3,'x', c = 'b')
 pl.plot(pacing_list,final_apd4,'x', c = 'b')
 pl.xlabel('PCL (ms)')
-#pl.plot(di, final_apd, 'x', c = 'b')
-#pl.plot(di2,final_apd2,'x', c = 'b')
-#pl.plot(di3,final_apd3,'x', c = 'b')
-#pl.plot(di4,final_apd4,'x', c = 'b')
-#pl.xlabel('DI (ms)')
-
 pl.ylabel('APD 95 (ms)')
-pl.title('Dynamic Restitution Curve- Endothelial Cells (Ohara 2011)')
+
+pl.figure()
+pl.plot(di, final_apd, 'x', c = 'b')
+pl.plot(di2,final_apd2,'x', c = 'b')
+pl.plot(di3,final_apd3,'x', c = 'b')
+pl.plot(di4,final_apd4,'x', c = 'b')
+pl.xlabel('DI (ms)')
+pl.ylabel('APD 95 (ms)')
+pl.xlim(0,360)
+pl.ylim(190,270)
+
+pl.title('Ohara (2011) Endothelial Cells Dynamic Protocol Restitution Curve')
 pl.show()
-'''
