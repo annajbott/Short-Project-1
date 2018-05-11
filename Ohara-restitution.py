@@ -4,17 +4,22 @@ import matplotlib.pyplot as pl
 from manual_APD import ap_duration
 import numpy as np
 from HF_model import Ord_HF_Gomez
-'''
+
 ## O'hara Restitution
 ## S1S2 steady state S1 pacing at 1000ms, single
 
-pcl = 1000
-step_size = 50
+# Using APD 90 for final S1 AP to calculate DI
+percent = 90
+bcl = 1000
 m = myokit.load_model('ohara-2011.mmt')
-HF = True
+
+# HF switch
+HF = False
 if HF:
     m = Ord_HF_Gomez()
-p = myokit.pacing.blocktrain(pcl, 0.5, offset=0, level=1.0, limit=0)
+
+# Set indefinitely recurring event of constant bcl
+p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=0)
 s = myokit.Simulation(m, p)
 
 # Set cell type
@@ -22,45 +27,63 @@ cell_types = {'Endocardial': 0, 'Epicardial' : 1, 'Mid-myocardial' : 2}
 cell_type = 'Endocardial'
 s.set_constant('cell.mode', cell_types[cell_type])
 
-#Pre pace to steady state
-s.pre(pcl * 300)
-apd_90 = []
-pacing_list = [280,290,297,298,300,305,310,315,320,330,340,350,380,400,450,550,700,900,1000,3000,5000,7000,9000,10300][::-1]
-for percent in [90, 70, 50, 30]:
-    di = []
-    apd_duration = []
-    i = 0
-    for pacing in pacing_list:
-        p = myokit.Protocol()
-        p.schedule(1, 0, 0.5, pcl, 5)
-        p.schedule(1, 4*pcl + pacing, 0.5, pcl, 1)
-        s.set_protocol(p)
-        d = s.run(pacing + 10*pcl)
-        start, duration, thresh = ap_duration(d, 5, repolarisation = percent)
+# Pre-pace with these conditions
+s.pre(100*bcl)
 
+# Set number of S1 beats to record after pre-pacing
+paces  = 3
+p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=paces)
+d = s.run(paces*bcl)
+
+# Calculate end of APD for final S1 beat. Can add DI to this value for S2 start time
+start, duration, thresh = ap_duration(d, paces, repolarisation = percent)
+end_final_s1 = start[-1] + duration[-1]
+
+# Reset so haven't run 3 paces already
+s.reset()
+pl.figure()
+
+# Have lines on graph for APD 30, 50, 70 and 90
+for percent in [90, 70, 50, 30]:
+    di_list = []
+    apd_duration = []
+    # Equally space points on base 10 log scale
+    for di in np.logspace(1,4, num = 30, base = 10.0):
+
+        # Finite number of S1 beats
+        p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=paces)
+        # Schedule S2 beat for the end of last AP (using APD 90) + given DI
+        p.schedule(1, end_final_s1 + di, 0.5, bcl, 1)
+
+        # Set protocol, run and calculate APDs
+        s.set_protocol(p)
+        d = s.run((paces + 1)*bcl + di)
+        start, duration, thresh = ap_duration(d, paces + 2, repolarisation = percent)
+
+        # Storing apd and DI for this pacing length
         apd_duration.append(duration[-1])
-        if percent == 90:
-            apd_90.append(duration[-2])
-        di.append(pacing - apd_90[i])
-        i += 1
+        di_list.append(di)
         s.reset()
-    pl.plot(di, apd_duration)
-    pl.plot(di, apd_duration, 'x',label='_nolegend_')
+
+    # Plot line once iterated over all DI values
+    pl.plot(di_list,apd_duration)
+    pl.plot(di_list,apd_duration, 'x', label = '_nolegend_')
 
 # Plot S1S2 protocol restitution curve
 pl.xlabel('Diastole interval (ms)')
 pl.ylabel('APD (ms)')
-pl.title('Ohara {} Cell Steady State S1-S2 Protocol Restitution Curve'.format(cell_type))
+pl.title('Ohara (2011) {} Cell, {} ms PCL S1-S2 Protocol Restitution Curve'.format(cell_type, bcl))
 pl.legend(['APD 90','APD 70','APD 50','APD 30'])
 pl.xlim(10,10000)
 pl.xscale('log')
 pl.show()
+
 '''
 
 ### Dynamic Protocol ###
 ### ---------------- ###
 m = myokit.load_model('ohara-2011.mmt')
-HF = True
+HF = False
 if HF:
     m = Ord_HF_Gomez()
 # Set cell type
@@ -75,7 +98,7 @@ offset_list = []
 p = myokit.Protocol()
 offset = 0
 # More points around high pacing, more likely to see graph bifurcate
-pacing_list = [230,235,240,245,250,255,260,270,290,310,320,335,350,390,430,470,510,550,590,670,710,750,830,910,950,1000][::-1]
+pacing_list = [90,120,150,180,200,230,250,270,290,310,335,350,390,430,470,510,550,590,670,710,750,830,910,950,1000][::-1]
 # Starting at low frequency pacing (1Hz), 30 seconds at each pacing and then moving towards 230ms
 for pacing in pacing_list:
     beats_per_pace = 30000/pacing
@@ -99,6 +122,8 @@ start, duration, thresh = ap_duration(d, 30000*len(pacing_list), repolarisation 
 # First offset equal to zero, so remove first entry from the list
 offset_list = offset_list[1:]
 print offset_list
+print start
+
 # Numpy array to contain final APD for each pacing cycle
 final_apd = np.zeros(len(offset_list) + 1)
 final_apd2 = np.zeros(len(offset_list) + 1)
@@ -113,7 +138,7 @@ for i in range(len(offset_list)):
     # Final peak of pacing cycle = peak before the first of a new pacing cycle
 
     # Index_start = The index of the start of pacing cycle in start array
-    index_start = np.nonzero(np.round(start,0) >= offset_list[i])[0][0]
+    index_start = np.nonzero(start >= offset_list[i])[0][0]
 
     # index_1 -1 to get peak at the end of the previous cycle
     final_apd[i] = duration[index_start]
@@ -140,15 +165,23 @@ di4.append(period[-1] - duration[-3])
 
 pl.figure()
 pl.plot(d['engine.time'],d['membrane.V'])
+pl.xlabel('Time (ms)')
+pl.ylabel('')
 
 # Plot the restitution curve
 pl.figure()
-pl.plot(di, final_apd, 'x', c = 'b')
-pl.plot(di2,final_apd2,'x', c = 'b')
-pl.plot(di3,final_apd3,'x', c = 'b')
-pl.plot(di4,final_apd4,'x', c = 'b')
-pl.xlabel('DI (ms)')
+pl.plot(pacing_list, final_apd, 'x', c = 'b')
+pl.plot(pacing_list,final_apd2,'x', c = 'b')
+pl.plot(pacing_list,final_apd3,'x', c = 'b')
+pl.plot(pacing_list,final_apd4,'x', c = 'b')
+pl.xlabel('PCL (ms)')
+#pl.plot(di, final_apd, 'x', c = 'b')
+#pl.plot(di2,final_apd2,'x', c = 'b')
+#pl.plot(di3,final_apd3,'x', c = 'b')
+#pl.plot(di4,final_apd4,'x', c = 'b')
+#pl.xlabel('DI (ms)')
 
 pl.ylabel('APD 95 (ms)')
 pl.title('Dynamic Restitution Curve- Endothelial Cells (Ohara 2011)')
 pl.show()
+'''
