@@ -4,12 +4,44 @@ import matplotlib.pyplot as pl
 import myokit
 import numpy as np
 
-def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
+def ap_duration(d, paces, repolarisation = 90, log_for_interval = 0):
 
     # Convert membrane potential and time lists to numpy arrays
     V = np.asarray(d['membrane.V'])
     # Depending on model, sometimes environment.time, others engine.time
     time = np.asarray(d['engine.time'])
+
+    ## If dynamic pacing protocol - no constant PCL, cannot use constant AP threshold ##
+    # Using log of pacing, create new threshold for each time pacing changes
+    if log_for_interval != False:
+        # Creating nummpy arrays for when pacing takes place
+        pace_log = np.asarray(log_for_interval['pace'])
+        pace_log_times =  np.asarray(log_for_interval.time())
+
+        # Indexes of values where pacing takes place, i.e. 1s not 0s
+        pace_index = np.nonzero(pace_log)
+        # Uses index numbers to find times in time list, when pacing occurs
+        # Removes every second pacing time, those with 0.5 added to the previous value
+        pacing_times  = pace_log_times[pace_index][::2]
+        print pacing_times
+        pacing_difference = np.zeros(len(pacing_times)-1)
+        for i in range(1, len(pacing_times)):
+            pacing_difference[i-1] = pacing_times[i] - pacing_times[i-1]
+
+        start_pace_index = np.nonzero(np.ediff1d(pacing_difference, to_begin = 0))
+        print start_pace_index
+        pace_start = [pacing_times[start_pace_index[i] + 1] for i in range(0,len(start_pace_index))][0]
+        pace_start = np.insert(pace_start,0,0)
+        print pace_start
+        pcl_thresh = np.zeros(len(pace_start))
+        for i in range(0, len(pace_start) -1):
+            pace_start_index = np.nonzero(time >= pace_start[i])[0][0]
+            pace_end_index = np.nonzero(time >= pace_start[i+1])[0][0]
+            pace_stable_start_index = pace_start_index + int((pace_end_index - pace_start_index)/3)
+            pcl_thresh[i] = min(V[pace_stable_start_index:pace_end_index]) + 8
+
+        pcl_thresh[-1] = min(V[np.nonzero(time >= pace_start[-1])[0][0]:]) + 8
+        print pcl_thresh
 
     # Blank numpy arrays to contain resting values, max peaks for each AP
     # Times of peaks, duration of APs and start of AP above some threshold
@@ -41,7 +73,9 @@ def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
 
     # Iterating over time points
     for i in range(1,len(V)):
-        # Taken from Chaste code: using gradients to determine upstrokes and rest
+
+        if log_for_interval != False:
+            AP_threshold = pcl_thresh[time[i] >= pace_start][-1]
 
         # Gradient calculated using difference in potential over time difference from previous time point
         voltage_grad = (V[i]-V[i-1])/float((time[i]-time[i-1]))
@@ -64,6 +98,7 @@ def ap_duration(d, paces, repolarisation = 90 , time_interval = None):
 
             # Now within AP
             in_ap = 1
+
 
             # Set resting value for this AP. Used as minimum
             resting_values[responses] = current_resting_value
@@ -242,7 +277,7 @@ def steady(m,p,pcl,paces):
         dist_array = np.zeros(len(V)-seq)
 
         # Length V = number of rows --> number of APs (periods)
-        for i in range(seq,len(V)):
+        for i in range(10*seq,len(V)):
             dist_av = 0
             for j in range(1,10):
                 # L-infinte
@@ -279,7 +314,7 @@ def steady(m,p,pcl,paces):
     return(ss)
 
 def main():
-    '''
+
     ### Testing APD calc section ###
     ### ------------------------ ###
     # Pre-pace simulation and run 30 cycles of simulation
@@ -292,29 +327,54 @@ def main():
     cell_types = {'Endocardial' : 0, 'Epicardial' : 1, 'Mid-myocardial' : 2}
     cell_type =  'Epicardial'
     s.set_constant('cell.celltype', cell_types[cell_type])
-
-    for pacing in range(100,400,50):
+    '''
+    for pacing in range(20,100,40):
       bcl = pacing
       p = myokit.Protocol()
       p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=0)
       s.set_protocol(p)
       #s.pre(200*bcl)
       # Running using function
-      paces = 5
+      paces = 20
+      s.pre(100*pacing)
       d = s.run(paces*bcl)
-      start, duration, thresh = ap_duration(d, paces)
+
       pl.figure()
       pl.plot(d['engine.time'], d['membrane.V'])
       pl.title('Ohara-Rudy-CIPA (2017) Epicardial cell at {} pace cycle length'.format(pacing))
+      start, duration, thresh = ap_duration(d, paces)
+      print start
       if len(start) > len(duration):
           start = start[0:-1]
       for i, start in enumerate(start):
           duration_ap = duration[i]
-          pl.arrow(start, thresh[i], duration_ap, 0, head_width=5, head_length=100,
+          pl.arrow(start, thresh[i], duration_ap, 0, head_width=3, head_length=duration_ap/3,
               length_includes_head=True)
-          pl.text(start + 40, -90, str(int(duration_ap)) + ' ms')
+          pl.text(start + duration_ap/3, -90, str(int(duration_ap)) + ' ms')
+
 
       s.reset()
+    '''
+    # Test it works for dynamic protocol with changing resting potential
+    p = myokit.Protocol()
+    bcl = 100
+    pcl = 50
+    p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=0)
+    s.set_protocol(p)
+    s.pre(200*bcl)
+    p = myokit.pacing.blocktrain(bcl, 0.5, offset=0, level=1.0, limit=10)
+    p.schedule(1,10*bcl, 0.5, pcl, 20)
+    p.schedule(1,10*bcl + 20*pcl, 0.5, 30, 20)
+    s.set_protocol(p)
+
+    logint = p.create_log_for_interval(0, p.characteristic_time(), for_drawing = True)
+
+    d = s.run(10*bcl + 20*pcl + 19*30)
+    start, duration, thresh = ap_duration(d, 10*bcl + 20*pcl + 19*30, log_for_interval = logint)
+    print len(start)
+    print start
+    pl.figure()
+    pl.plot(d['engine.time'], d['membrane.V'])
     pl.show()
 
 
@@ -348,6 +408,7 @@ def main():
     #pl.xlabel('Pacing cycle length (ms)')
     #pl.ylabel('Number of paces')
     pl.show()
+    '''
 
 if __name__ == "__main__":
     main()
