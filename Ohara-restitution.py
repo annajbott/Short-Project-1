@@ -101,7 +101,7 @@ offset_list = []
 p = myokit.Protocol()
 offset = 0
 # More points around high pacing, more likely to see graph bifurcate
-pacing_list = np.logspace(2,3, num = 30, base = 10.0)[::-1]
+pacing_list = np.logspace(1.7,3, num = 30, base = 10.0)[::-1]
 pacing_list = [int(i) for i in pacing_list]
 # Starting at low frequency pacing (1Hz), 30 seconds at each pacing and then moving towards 230ms
 for pacing in pacing_list:
@@ -120,8 +120,11 @@ s.set_constant('cell.mode', cell_types[cell_type])
 # Run the simulation with final offset value, equal to time passed for whole protocol
 d = s.run(offset, log = ['membrane.V','engine.time'])
 
+# Including log of paces, as pacing is not constant, changes threshold for each pace
+logint = p.create_log_for_interval(0, p.characteristic_time(), for_drawing = True)
+
 # Use ap_duration function to calculate start times and durations
-start, duration, thresh = ap_duration(d, 30000*len(pacing_list), repolarisation = 95)
+start, duration, thresh = ap_duration(d, 30000*len(pacing_list), repolarisation = 95, log_for_interval = logint)
 
 # First offset equal to zero, so remove first entry from the list
 offset_list = offset_list[1:]
@@ -168,7 +171,10 @@ di4.append(period[-1] - duration[-3])
 pl.figure()
 pl.plot(d['engine.time'],d['membrane.V'])
 pl.xlabel('Time (ms)')
-pl.ylabel('')
+pl.ylabel('Membrane Potential (mV)')
+for value in offset_list:
+    pl.axvline(x= value, color = 'red', ls = 'dotted', ymin = 0.05, ymax = 0.96)
+
 
 # Plot the restitution curve
 pl.figure()
@@ -187,7 +193,7 @@ pl.plot(di4,final_apd4,'x', c = 'b')
 pl.xlabel('DI (ms)')
 pl.ylabel('APD 95 (ms)')
 pl.xlim(0,360)
-pl.ylim(190,270)
+
 
 pl.title('Ohara (2011) Endothelial Cells Dynamic Protocol Restitution Curve')
 pl.show()
