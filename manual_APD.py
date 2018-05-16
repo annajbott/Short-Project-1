@@ -4,44 +4,12 @@ import matplotlib.pyplot as pl
 import myokit
 import numpy as np
 
-def ap_duration(d, paces, repolarisation = 90, log_for_interval = 0):
+def ap_duration(d, paces, repolarisation = 90):
 
     # Convert membrane potential and time lists to numpy arrays
     V = np.asarray(d['membrane.V'])
     # Depending on model, sometimes environment.time, others engine.time
     time = np.asarray(d['engine.time'])
-
-    ## If dynamic pacing protocol - no constant PCL, cannot use constant AP threshold ##
-    # Using log of pacing, create new threshold for each time pacing changes
-    if log_for_interval != False:
-        # Creating nummpy arrays for when pacing takes place
-        pace_log = np.asarray(log_for_interval['pace'])
-        pace_log_times =  np.asarray(log_for_interval.time())
-
-        # Indexes of values where pacing takes place, i.e. 1s not 0s
-        pace_index = np.nonzero(pace_log)
-        # Uses index numbers to find times in time list, when pacing occurs
-        # Removes every second pacing time, those with 0.5 added to the previous value
-        pacing_times  = pace_log_times[pace_index][::2]
-        print pacing_times
-        pacing_difference = np.zeros(len(pacing_times)-1)
-        for i in range(1, len(pacing_times)):
-            pacing_difference[i-1] = pacing_times[i] - pacing_times[i-1]
-
-        start_pace_index = np.nonzero(np.ediff1d(pacing_difference, to_begin = 0))
-        print start_pace_index
-        pace_start = [pacing_times[start_pace_index[i] + 1] for i in range(0,len(start_pace_index))][0]
-        pace_start = np.insert(pace_start,0,0)
-        print pace_start
-        pcl_thresh = np.zeros(len(pace_start))
-        for i in range(0, len(pace_start) -1):
-            pace_start_index = np.nonzero(time >= pace_start[i])[0][0]
-            pace_end_index = np.nonzero(time >= pace_start[i+1])[0][0]
-            pace_stable_start_index = pace_start_index + int((pace_end_index - pace_start_index)/3)
-            pcl_thresh[i] = min(V[pace_stable_start_index:pace_end_index]) + 8
-
-        pcl_thresh[-1] = min(V[np.nonzero(time >= pace_start[-1])[0][0]:]) + 8
-        print pcl_thresh
 
     # Blank numpy arrays to contain resting values, max peaks for each AP
     # Times of peaks, duration of APs and start of AP above some threshold
@@ -72,10 +40,7 @@ def ap_duration(d, paces, repolarisation = 90, log_for_interval = 0):
     apd_start_time = None
 
     # Iterating over time points
-    for i in range(1,len(V)):
-
-        if log_for_interval != False:
-            AP_threshold = pcl_thresh[time[i] >= pace_start][-1]
+    for i in range(1, len(V)):
 
         # Gradient calculated using difference in potential over time difference from previous time point
         voltage_grad = (V[i]-V[i-1])/float((time[i]-time[i-1]))
@@ -193,7 +158,6 @@ def ap_duration(d, paces, repolarisation = 90, log_for_interval = 0):
             # Skip to next AP if start of this AP is reached before last AP is finished
             continue
 
-
         # If apd_start_index has a value then look forwards in time for repolarisation
         if apd_starting_index != None:
             prev_t = time[apd_starting_index - 1]
@@ -203,6 +167,7 @@ def ap_duration(d, paces, repolarisation = 90, log_for_interval = 0):
                     # Linear interpolation
                     apd_end_time = time[t - 1] + ((custom_thresh - prev_v) / (V[t] - prev_v)) * (time[t] - time[t - 1])
                     duration_ap[ap_index] = apd_end_time - apd_start_time
+                    #print apd_end_time, apd_start_time
                     break
                 prev_t = time[t]
                 prev_v = V[t]
