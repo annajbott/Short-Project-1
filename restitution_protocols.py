@@ -4,6 +4,7 @@ import matplotlib.pyplot as pl
 from manual_APD import ap_duration
 from apd_dynamic import apd_dynamic
 import numpy as np
+from HF_model import *
 
 ## --------------------------------------------- ##
 ## Functions for different restitution protocols ##
@@ -17,8 +18,9 @@ import numpy as np
 # Plots PCL vs APD (repolarisation % to be specified)
 # Specify model and cell type
 
-#models = ['tentusscher-2006', 'grandi-2010', 'ohara-2011', 'ohara-cipa-v1-2017.mmt']
-def dynamic_protocol(model, time_per_stage = 30000, max_pcl = 1000, min_pcl = 50, number_stages = 20, repolarisation = 90, cell_type = 1, voltage_plot = False):
+#models = ['tentusscher-2006', 'grandi-2010', 'ohara-2011', 'ohara-cipa-v1-2017', 'grandi-2010_modified']
+#HF_model = ['Gomez','Elshrif','Moreno', 'Lu']
+def dynamic_protocol(model, time_per_stage = 30000, max_pcl = 1000, min_pcl = 50, number_stages = 20, repolarisation = 90, cell_type = 1, voltage_plot = False, HF_model = None, plot_from_function = True):
     cell_types = {0:'Endocardial', 1: 'Epicardial', 2: 'Mid-myocardial'}
     if model == 'tentusscher-2006':
         label = 'cell.type'
@@ -27,6 +29,10 @@ def dynamic_protocol(model, time_per_stage = 30000, max_pcl = 1000, min_pcl = 50
         label = 'type.epi'
         cell_types = {0:'Endocardial', 1: 'Epicardial'}
         name = 'Grandi (2010)'
+    elif model == 'grandi-2010_modified':
+        label = 'type.epi'
+        cell_types = {0:'Endocardial', 1: 'Epicardial'}
+        name = 'Grandi (2010) with late sodium channel'
     elif model == 'ohara-2011':
         label = 'cell.mode'
         name = "O'hara (2011)"
@@ -36,6 +42,11 @@ def dynamic_protocol(model, time_per_stage = 30000, max_pcl = 1000, min_pcl = 50
 
     p = myokit.Protocol()
     m = myokit.load_model('{}.mmt'.format(model))
+    models_HF = {'Ord_HF_Gomez' : Ord_HF_Gomez, 'Ord_HF_Elshrif' : Ord_HF_Elshrif, 'GPB_HF_Gomez' : GPB_HF_Gomez, 'GPB_HF_Gomez': GPB_HF_Moreno, 'TT_HF_Lu' : TT_HF_Lu}
+    if HF_model != None:
+        m_str = '{}_HF_{}'.format(HF_label, HF_model)
+        m_func = models_HF[m_str]
+        m = m_func(cell_type)
 
     # Empty arrays to fill.
     period = []
@@ -128,24 +139,38 @@ def dynamic_protocol(model, time_per_stage = 30000, max_pcl = 1000, min_pcl = 50
 ## --------------- ##
 
 #models = ['tentusscher-2006', 'grandi-2010', 'ohara-2011', 'ohara-cipa-v1-2017.mmt']
-def s1s2_protocol(model, number_S1, PCL_S1 = 1000, pre_pacing = 200, min_di = 10, max_di = 1000, number_di = 30, repolarisation = 90, cell_type = 1, log_scale = False):
+def s1s2_protocol(model, number_S1, PCL_S1 = 1000, pre_pacing = 200, min_di = 10, max_di = 1000, number_di = 30, repolarisation = 90, cell_type = 1, log_scale = False, HF_model = None, plot_from_function = True):
     cell_types = {0:'Endocardial', 1: 'Epicardial', 2: 'Mid-myocardial'}
     if model == 'tentusscher-2006':
         label = 'cell.type'
         name  = 'Ten-Tusscher (2006)'
+        HF_label = 'TT'
     elif model == 'grandi-2010':
         label = 'type.epi'
         cell_types = {0:'Endocardial', 1: 'Epicardial'}
         name = 'Grandi (2010)'
+        HF_label = 'GPB'
+    elif model == 'grandi-2010_modified':
+        label = 'type.epi'
+        cell_types = {0:'Endocardial', 1: 'Epicardial'}
+        name = 'Grandi (2010) with late sodium channel'
+        HF_label = 'GPB'
     elif model == 'ohara-2011':
         label = 'cell.mode'
         name = "O'hara (2011)"
-    elif model == 'ohara-cipa-v1-2017.mmt':
+        HF_label = 'Ord'
+    elif model == 'ohara-cipa-v1-2017':
         label = 'cell.celltype'
         name = "O'hara- CiPA (2017)"
+        HF_label = 'Ordcipa'
 
     p = myokit.Protocol()
     m = myokit.load_model('{}.mmt'.format(model))
+    models_HF = {'Ord_HF_Gomez' : Ord_HF_Gomez, 'Ord_HF_Elshrif' : Ord_HF_Elshrif, 'GPB_HF_Gomez' : GPB_HF_Gomez, 'GPB_HF_Gomez': GPB_HF_Moreno, 'TT_HF_Lu' : TT_HF_Lu, 'Ordcipa_HF_Gomez' : Ordcipa_HF_Gomez, 'Ordcipa_HF_Elshrif' : Ordcipa_HF_Elshrif}
+    if HF_model != None:
+        m_str = '{}_HF_{}'.format(HF_label, HF_model)
+        m_func = models_HF[m_str]
+        m = m_func(cell_type)
 
     # Set indefinitely recurring event of constant bcl
     p = myokit.pacing.blocktrain(PCL_S1, 0.5, offset=0, level=1.0, limit=0)
@@ -155,18 +180,16 @@ def s1s2_protocol(model, number_S1, PCL_S1 = 1000, pre_pacing = 200, min_di = 10
     # Pre-pace with these conditions
     s.pre(pre_pacing*PCL_S1)
     # Set number of S1 beats to record after pre-pacing
-    paces  = 3
     p = myokit.pacing.blocktrain(PCL_S1, 0.5, offset=0, level=1.0, limit = number_S1)
     s.set_protocol(p)
     d = s.run(number_S1*PCL_S1)
 
     # Calculate end of AP for final S1 beat (APD 90). Can add DI to this value for S2 start time
-    start, duration, thresh = ap_duration(d, number_S1, repolarisation = 90)
+    start, duration, thresh = ap_duration(d, number_S1, repolarisation = 95)
     end_final_s1 = start[-1] + duration[-1]
 
-    # Reset so haven't run 3 paces already
+    # Reset
     s.reset()
-    pl.figure()
 
     di_list = np.zeros(number_di)
     apd_list = np.zeros(number_di)
@@ -193,19 +216,27 @@ def s1s2_protocol(model, number_S1, PCL_S1 = 1000, pre_pacing = 200, min_di = 10
         di_list[i] = (di)
         s.reset()
         i += 1
+    grad_list = np.zeros(len(di_list) -1)
+    for i in range(1,len(di_list)):
+        grad_list[i-1] =  (apd_list[i]-apd_list[i-1])/(di_list[i] - di_list[i-1])
+    max_grad = max(grad_list)
 
-    # Plot line once iterated over all DI values
-    pl.plot(di_list,apd_list)
-    pl.plot(di_list, apd_list, 'x', label = '_nolegend_')
+    if plot_from_function == True:
+        pl.figure()
+        # Plot line once iterated over all DI values
+        pl.plot(di_list,apd_list)
+        pl.plot(di_list, apd_list, 'x', label = '_nolegend_')
 
-    # Plot S1S2 protocol restitution curve
-    pl.xlabel('Diastole interval (ms)')
-    pl.ylabel('APD {}(ms)'.format(repolarisation))
-    pl.title('{} {} Cell, {} ms PCL S1-S2 Protocol Restitution Curve'.format(name, cell_types[cell_type], PCL_S1))
-    if log_scale == True:
-        pl.xscale('log')
-        pl.xlim(min_di, max_di)
-    pl.show()
+        # Plot S1S2 protocol restitution curve
+        pl.xlabel('Diastole interval (ms)')
+        pl.ylabel('APD {}(ms)'.format(repolarisation))
+        pl.title('{} {} Cell, {} ms PCL S1-S2 Protocol Restitution Curve'.format(name, cell_types[cell_type], PCL_S1))
+        if log_scale == True:
+            pl.xscale('log')
+            pl.xlim(min_di, max_di)
+        pl.show()
+
+    return(di_list, apd_list, max_grad)
 
 ## Multistability Test Protocol. S1-CI-S2. ##
 ## --------------------------------------- ##
@@ -222,6 +253,10 @@ def s1cis2(model, time_per_stage, max_pcl = 1000, min_pcl = 100, number_stages =
         label = 'type.epi'
         cell_types = {0:'Endocardial', 1: 'Epicardial'}
         name = 'Grandi (2010)'
+    elif model == 'grandi-2010_modified':
+        label = 'type.epi'
+        cell_types = {0:'Endocardial', 1: 'Epicardial'}
+        name = 'Grandi (2010) with late sodium channel'
     elif model == 'ohara-2011':
         label = 'cell.mode'
         name = "O'hara (2011)"
@@ -267,7 +302,7 @@ def s1cis2(model, time_per_stage, max_pcl = 1000, min_pcl = 100, number_stages =
 
         # Use ap_duration function to calculate start times and durations
         #start, duration, thresh = ap_duration(d, 30000*len(pacing_list), repolarisation = 95, log_for_interval = logint)
-        start, duration, thresh = apd_dynamic(d, p, 30000*len(pacing_list), repolarisation = repolarisation)
+        start, duration, thresh = apd_dynamic(d, p, time_per_stage*len(pacing_list), repolarisation = repolarisation)
 
         # Numpy array to contain final APD for each pacing cycle (and 3 previous APs in case of alternans)
         final_apd = np.zeros(len(offset_list))
@@ -294,6 +329,8 @@ def s1cis2(model, time_per_stage, max_pcl = 1000, min_pcl = 100, number_stages =
             # Final peak of pacing cycle = peak before the first of a new pacing cycle
 
             # Index_start = The index of the start of pacing cycle in start array
+            print start
+            print offset_list
             index_start = np.nonzero(start >= offset_list[i])[0][0]
 
             pl.arrow(start[index_start-2], thresh[index_start-2], duration[index_start-2], 0, head_width=2, head_length=duration[index_start-2]/3, length_includes_head=True)
@@ -323,3 +360,5 @@ def s1cis2(model, time_per_stage, max_pcl = 1000, min_pcl = 100, number_stages =
         pl.title('{} {} Cells Multistability Test Protocol Bifurcation Diagram. CI = {} ms'.format(name,cell_types[cell_type], ci))
 
     pl.show()
+
+#s1s2_protocol('ohara-2011', number_S1 = 10, PCL_S1 = 1000, pre_pacing = 200, min_di = 10, max_di = 1000, number_di = 50, repolarisation = 90, cell_type = 1, log_scale = False, HF_model = 'Elshrif')
