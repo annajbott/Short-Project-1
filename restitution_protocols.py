@@ -20,25 +20,30 @@ from HF_model import *
 
 #models = ['tentusscher-2006', 'grandi-2010', 'ohara-2011', 'ohara-cipa-v1-2017', 'grandi-2010_modified']
 #HF_model = ['Gomez','Elshrif','Moreno', 'Lu']
-def dynamic_protocol(model, time_per_stage = 30000, max_pcl = 1000, min_pcl = 50, number_stages = 20, repolarisation = 90, cell_type = 1, voltage_plot = False, HF_model = None, plot_from_function = True):
+def dynamic_protocol(model, time_per_stage = 30000, stimuli_per_pace = None , max_pcl = 1000, min_pcl = 50, number_stages = 20, repolarisation = 90, cell_type = 1, voltage_plot = False, HF_model = None, plot_from_function = True):
     cell_types = {0:'Endocardial', 1: 'Epicardial', 2: 'Mid-myocardial'}
     if model == 'tentusscher-2006':
         label = 'cell.type'
         name  = 'Ten-Tusscher (2006)'
+        HF_label = 'TT'
     elif model == 'grandi-2010':
         label = 'type.epi'
         cell_types = {0:'Endocardial', 1: 'Epicardial'}
         name = 'Grandi (2010)'
+        HF_label = 'GPB'
     elif model == 'grandi-2010_modified':
         label = 'type.epi'
         cell_types = {0:'Endocardial', 1: 'Epicardial'}
         name = 'Grandi (2010) with late sodium channel'
+        HF_label = 'GPB'
     elif model == 'ohara-2011':
         label = 'cell.mode'
         name = "O'hara (2011)"
-    elif model == 'ohara-cipa-v1-2017.mmt':
+        HF_label = 'Ord'
+    elif model == 'ohara-cipa-v1-2017':
         label = 'cell.celltype'
         name = "O'hara- CiPA (2017)"
+        HF_label = 'Ordcipa'
 
     p = myokit.Protocol()
     m = myokit.load_model('{}.mmt'.format(model))
@@ -46,7 +51,7 @@ def dynamic_protocol(model, time_per_stage = 30000, max_pcl = 1000, min_pcl = 50
     if HF_model != None:
         m_str = '{}_HF_{}'.format(HF_label, HF_model)
         m_func = models_HF[m_str]
-        m = m_func(cell_type)
+        hf_m = m_func(cell_type)
 
     # Empty arrays to fill.
     period = []
@@ -60,6 +65,11 @@ def dynamic_protocol(model, time_per_stage = 30000, max_pcl = 1000, min_pcl = 50
     # Starting at low frequency pacing (1Hz), 30 seconds at each pacing and then moving towards 230ms
     for pacing in pacing_list:
         beats_per_pace = (time_per_stage)/pacing
+        if stimuli_per_pace != None:
+            beats_per_pace = stimuli_per_pace
+            no_runs = 50*np.sum(pacing_list)
+        else:
+            no_runs = time_per_stage*len(pacing_list)
         p.schedule(1, start = offset, duration =0.5, period = pacing, multiplier = beats_per_pace)
         offset_list.append(offset)
         # Next set of pacing events to be scheduled by this offset (beats per pace * pace)
@@ -70,6 +80,18 @@ def dynamic_protocol(model, time_per_stage = 30000, max_pcl = 1000, min_pcl = 50
     s = myokit.Simulation(m, p)
     s.set_constant(label, cell_type)
 
+    ## HF model as well ##
+    if HF_model != None:
+        hf_s = myokit.Simulation(hf_m, p)
+        hf_s.set_constant(label, cell_type)
+        hf_d = hf_s.run(offset, log = ['membrane.V','engine.time'])
+        hf_start, hf_duration, hf_thresh = apd_dynamic(hf_d, p, no_runs, repolarisation = repolarisation)
+
+        hf_final_apd = np.zeros(len(offset_list))
+        hf_final_apd2 = np.zeros(len(offset_list))
+        hf_final_apd3 = np.zeros(len(offset_list))
+        hf_final_apd4 = np.zeros(len(offset_list))
+
     # Run the simulation with final offset value, equal to time passed for whole protocol
     d = s.run(offset, log = ['membrane.V','engine.time'])
 
@@ -78,7 +100,7 @@ def dynamic_protocol(model, time_per_stage = 30000, max_pcl = 1000, min_pcl = 50
 
     # Use ap_duration function to calculate start times and durations
     #start, duration, thresh = ap_duration(d, 30000*len(pacing_list), repolarisation = 95, log_for_interval = logint)
-    start, duration, thresh = apd_dynamic(d, p, 30000*len(pacing_list), repolarisation = repolarisation)
+    start, duration, thresh = apd_dynamic(d, p, no_runs, repolarisation = repolarisation)
 
     # Numpy array to contain final APD for each pacing cycle (and 3 previous APs in case of alternans)
     final_apd = np.zeros(len(offset_list))
@@ -115,20 +137,43 @@ def dynamic_protocol(model, time_per_stage = 30000, max_pcl = 1000, min_pcl = 50
         final_apd2[i] = duration[index_start - 3]
         final_apd3[i] = duration[index_start - 4]
         final_apd4[i] = duration[index_start - 5]
+        if HF_model != None:
+            hf_index_start = np.nonzero(hf_start >= offset_list[i])[0][0]
+            hf_final_apd[i] = hf_duration[hf_index_start -2]
+            hf_final_apd2[i] = hf_duration[hf_index_start - 3]
+            hf_final_apd3[i] = hf_duration[hf_index_start - 4]
+            hf_final_apd4[i] = hf_duration[hf_index_start - 5]
 
-    # The final peak doesn't have a peak after it, so can be indexed by the final duration recorded
+    # The final peak doesn't have an offset after, so can be indexed by the final duration recorded (take a few for alternans)
     final_apd[-1] = duration[-2]
-    # If the graph has a long-short pattern, take previous APDs and DIs as well
     final_apd2[-1] = duration[-3]
     final_apd3[-1] = duration[-4]
     final_apd4[-1] = duration[-5]
 
+    if HF_model != None:
+        hf_final_apd[-1] = hf_duration[-2]
+        hf_final_apd2[-1] = hf_duration[-3]
+        hf_final_apd3[-1] = hf_duration[-4]
+        hf_final_apd4[-1] = hf_duration[-5]
+
     # Plot the restitution curve
     pl.figure()
-    pl.plot(pacing_list, final_apd, 'x', c = 'b')
-    pl.plot(pacing_list,final_apd2,'x', c = 'b')
-    pl.plot(pacing_list,final_apd3,'x', c = 'b')
-    pl.plot(pacing_list,final_apd4,'x', c = 'b')
+    pl.plot(pacing_list, final_apd, '.', c = 'b')
+    pl.plot(pacing_list,final_apd2,'.', c = 'b')
+    pl.plot(pacing_list,final_apd3,'.', c = 'b')
+    pl.plot(pacing_list,final_apd4,'.', c = 'b')
+
+    if HF_model != None:
+        hf_final_apd[-1] = hf_duration[-2]
+        hf_final_apd2[-1] = hf_duration[-3]
+        hf_final_apd3[-1] = hf_duration[-4]
+        hf_final_apd4[-1] = hf_duration[-5]
+        pl.plot(pacing_list, hf_final_apd, '.', c = 'C1')
+        pl.plot(pacing_list, hf_final_apd2,'.', c = 'C1')
+        pl.plot(pacing_list, hf_final_apd3,'.', c = 'C1')
+        pl.plot(pacing_list, hf_final_apd4,'.', c = 'C1')
+        pl.legend(['Healthy', 'HF'])
+
     pl.xlabel('PCL (ms)')
     pl.ylabel('APD {} (ms)'.format(repolarisation))
 
