@@ -10,7 +10,7 @@ from HF_model import *
 ## -------------------------------------------------------------------------- ##
 
 # Plots for protocol, APs and restitution curve
-def HRV_return(model, HF_model = None, HF_protocol = None, number_runs = 50, cell_type = 0, AP_plot = False, protocol_plot = True, max_PCL = None, min_PCL = None, APD_time_plot = False):
+def HRV_return(model, HF_model = None, HF_protocol = None, number_points_up = 30,number_runs = 50, cell_type = 0, restitution_curve = False , AP_plot = False, protocol_plot = True, max_PCL = None, min_PCL = None, average_init = None, APD_time_plot = False):
 
     cell_types = {0:'Endocardial', 1: 'Epicardial', 2: 'Mid-myocardial'}
     if model == 'tentusscher-2006':
@@ -38,6 +38,7 @@ def HRV_return(model, HF_model = None, HF_protocol = None, number_runs = 50, cel
 
     m = myokit.load_model('{}.mmt'.format(model))
     models_HF = {'Ord_HF_Gomez' : Ord_HF_Gomez, 'Ord_HF_Elshrif' : Ord_HF_Elshrif, 'GPB_HF_Gomez' : GPB_HF_Gomez, 'GPB_HF_Gomez': GPB_HF_Moreno, 'TT_HF_Lu' : TT_HF_Lu,'Ordcipa_HF_Elshrif' : Ordcipa_HF_Elshrif, 'Ordcipa_HF_Gomez': Ordcipa_HF_Gomez}
+    models_HF_col = {'Ord_HF_Gomez' : 'orange', 'Ord_HF_Elshrif' : 'limegreen', 'GPB_HF_Gomez' : 'orange', 'GPB_HF_Moreno': 'm', 'TT_HF_Lu' : 'gold', 'Ordcipa_HF_Elshrif' : 'limegreen', 'Ordcipa_HF_Gomez': 'orange'}
     if HF_model != None:
         m_str = '{}_HF_{}'.format(HF_label, HF_model)
         m_func = models_HF[m_str]
@@ -49,7 +50,7 @@ def HRV_return(model, HF_model = None, HF_protocol = None, number_runs = 50, cel
     p = myokit.Protocol()
 
     # Using sin wave to simulate step protocol
-    points = np.linspace(0,2*np.pi, num  = 30, endpoint = False)
+    points = np.linspace(0,2*np.pi, num  = number_points_up, endpoint = False)
     hr_pacing_list = []
     if HF_protocol == None:
         average = 75
@@ -67,12 +68,16 @@ def HRV_return(model, HF_model = None, HF_protocol = None, number_runs = 50, cel
         amplitude = 8
         protocol_label = ' HF 6-min Walk HRV Protocol'
 
-    # If min and max pcl specified, override protocol options
-    if max_PCL != None and min_PCL != None:
+    # If min and max pcl specified, override protocol options, but only if average not specified
+    if max_PCL != None and min_PCL != None and average_init == None:
         max_hr = 60000.0/max_PCL
         min_hr = 60000.0/min_PCL
         average = np.round((max_hr + min_hr)/2.0,0)
         amplitude = np.round((max_hr - min_hr)/2.0,0)
+
+    # If average is specified, take that value, but use amplitudes from earlier
+    if average_init != None:
+        average = 60000.0/average_init
     for i in points:
         # Using a sin wave centered around the average (18.5,10, 5 = amplitude)
         hr_pacing_list.append(average +amplitude*np.sin(i-np.pi/2.0))
@@ -106,7 +111,7 @@ def HRV_return(model, HF_model = None, HF_protocol = None, number_runs = 50, cel
 
     s = myokit.Simulation(m, p)
     s.set_constant(label, cell_type)
-    s.pre(np.sum(pacing_list)*10)
+    s.pre(np.sum(pacing_list)*20)
     s.reset()
     d = s.run(offset, log = ['membrane.V','engine.time'])
     start, duration, thresh = ap_duration(d, number_runs*len(pacing_list), repolarisation = 90)
@@ -150,40 +155,93 @@ def HRV_return(model, HF_model = None, HF_protocol = None, number_runs = 50, cel
 
     ## APD vs time plot ##
     ## ---------------- ##
-    pcl_start_sec = [element/1000.0 for element in pcl_start]
+    start = [element/1000.0 for element in start]
 
     if APD_time_plot == True:
         pl.figure()
+        if len(start) > len(duration):
+            start = start[0:-1]
         pl.plot(start, duration,'.-')
         pl.xlabel('Time (sec)')
         pl.ylabel('APD (ms)')
         #pl.title('APD varying over time with the HRV protocol')
         #pl.xlim(500,650)
+
+
+    if restitution_curve == True:
+        pl.figure()
+        pl.plot(pcl_start[4*len(pcl_start)/5 :], duration[4*len(pcl_start)/5:], '.')
+        pl.xlabel('PCL (ms)')
+        pl.ylabel('APD 90 (ms)')
+
+
     # Show plots
     pl.show()
 
     return(pcl_start, duration)
 # Main function for testing
 def main():
+    #m = 'ohara-2011'
+    m = 'ohara-cipa-v1-2017'
     '''
-    pcl_APs, duration =  HRV_return(model = 'ohara-2011', number_runs = 30, HF_protocol = None, HF_model = None, cell_type = 0,  AP_plot = False, protocol_plot = False)
-    hf_pcl_APs, hf_duration =  HRV_return(model = 'ohara-2011', number_runs = 30, HF_protocol = 'HF', HF_model = 'Elshrif', cell_type = 0,  AP_plot = False, protocol_plot = False)
-    hf_walk_pcl_APs, hf_walk_duration =  HRV_return(model = 'ohara-2011', number_runs = 30, HF_protocol = 'HF_walk', HF_model = 'Elshrif', cell_type = 0,  AP_plot = False, protocol_plot = False)
+    HF_m = 'Elshrif'
+    pcl_APs, duration =  HRV_return(model = m, number_runs = 30, HF_protocol = None, HF_model = None, cell_type = 0,  AP_plot = False, protocol_plot = False)
+    hf_pcl_APs, hf_duration =  HRV_return(model = m, number_runs = 30, HF_protocol = 'HF', HF_model = HF_m, cell_type = 0,  AP_plot = False, protocol_plot = False)
+    hf_walk_pcl_APs, hf_walk_duration =  HRV_return(model = m, number_runs = 30, HF_protocol = 'HF_walk', HF_model = HF_m, cell_type = 0,  AP_plot = False, protocol_plot = False)
 
-    a_pcl_APs, a_duration =  HRV_return(model = 'ohara-2011', number_runs = 30, HF_protocol = 'HF', HF_model = None, cell_type = 0,  AP_plot = False, protocol_plot = False)
-    b_pcl_APs, b_duration =  HRV_return(model = 'ohara-2011', number_runs = 30, HF_protocol = None, HF_model = 'Elshrif', cell_type = 0,  AP_plot = False, protocol_plot = False)
+    a_pcl_APs, a_duration =  HRV_return(model = m, number_runs = 30, HF_protocol = 'HF', HF_model = None, cell_type = 0,  AP_plot = False, protocol_plot = False)
+    b_pcl_APs, b_duration =  HRV_return(model = m, number_runs = 30, HF_protocol = None, HF_model = HF_m, cell_type = 0,  AP_plot = False, protocol_plot = False)
 
-    pl.plot(pcl_APs[len(pcl_APs)/2 :], duration[len(pcl_APs)/2:], '.')
-    pl.plot(hf_pcl_APs[len(hf_pcl_APs)/2 :], hf_duration[len(hf_pcl_APs)/2:], '.')
-    pl.plot(hf_walk_pcl_APs[len(hf_walk_pcl_APs)/2 :], hf_walk_duration[len(hf_walk_pcl_APs)/2:], '.')
+    pl.plot(pcl_APs[len(pcl_APs)/2 :], duration[len(pcl_APs)/2:], '.', color = 'b')
+    pl.plot(hf_pcl_APs[len(hf_pcl_APs)/2 :], hf_duration[len(hf_pcl_APs)/2:], '.', color = 'limegreen')
+    pl.plot(hf_walk_pcl_APs[len(hf_walk_pcl_APs)/2 :], hf_walk_duration[len(hf_walk_pcl_APs)/2:], '.', color = 'darkgreen')
 
-    pl.plot(a_pcl_APs[len(a_pcl_APs)/2 :], a_duration[len(a_pcl_APs)/2:], '.')
-    pl.plot(b_pcl_APs[len(b_pcl_APs)/2 :], b_duration[len(b_pcl_APs)/2:], '.')
+    pl.plot(a_pcl_APs[len(a_pcl_APs)/2 :], a_duration[len(a_pcl_APs)/2:], '.', color = 'midnightblue')
+    pl.plot(b_pcl_APs[len(b_pcl_APs)/2 :], b_duration[len(b_pcl_APs)/2:], '.', color = 'turquoise')
+    pl.legend(['Normal model, healthy protocol', 'HF model, HF rest protocol', 'HF model, HF exercise protocol','Normal model, HF rest protocol', 'HF model, healthy protocol'])
+    pl.ylabel('APD 90 (ms)')
+    pl.xlabel('PCL (ms)')
 
-    pl.legend(['Normal model, healthy protocol', 'HF model, HF protocol at rest', 'HF model, HF protocol 6-min walk test','Normal model, HF protocol', 'HF model, healthy protocol'])
+
+    HF_m = 'Gomez'
+    pcl_APs, duration =  HRV_return(model = m, number_runs = 30, HF_protocol = None, HF_model = None, cell_type = 0,  AP_plot = False, protocol_plot = False)
+    hf_pcl_APs, hf_duration =  HRV_return(model = m, number_runs = 30, HF_protocol = 'HF', HF_model = HF_m, cell_type = 0,  AP_plot = False, protocol_plot = False)
+    hf_walk_pcl_APs, hf_walk_duration =  HRV_return(model = m, number_runs = 30, HF_protocol = 'HF_walk', HF_model = HF_m, cell_type = 0,  AP_plot = False, protocol_plot = False)
+
+    a_pcl_APs, a_duration =  HRV_return(model = m, number_runs = 30, HF_protocol = 'HF', HF_model = None, cell_type = 0,  AP_plot = False, protocol_plot = False)
+    b_pcl_APs, b_duration =  HRV_return(model = m, number_runs = 30, HF_protocol = None, HF_model = HF_m, cell_type = 0,  AP_plot = False, protocol_plot = False)
+
+    pl.plot(pcl_APs[len(pcl_APs)/2 :], duration[len(pcl_APs)/2:], '.', color = 'b')
+    pl.plot(hf_pcl_APs[len(hf_pcl_APs)/2 :], hf_duration[len(hf_pcl_APs)/2:], '.', color = 'orange')
+    pl.plot(hf_walk_pcl_APs[len(hf_walk_pcl_APs)/2 :], hf_walk_duration[len(hf_walk_pcl_APs)/2:], '.', color = 'firebrick')
+
+    pl.plot(a_pcl_APs[len(a_pcl_APs)/2 :], a_duration[len(a_pcl_APs)/2:], '.', color = 'midnightblue')
+    pl.plot(b_pcl_APs[len(b_pcl_APs)/2 :], b_duration[len(b_pcl_APs)/2:], '.', color = 'darksalmon')
+    pl.legend(['Normal model, healthy protocol', 'HF model, HF rest protocol', 'HF model, HF exercise protocol','Normal model, HF rest protocol', 'HF model, healthy protocol'])
+    pl.ylabel('APD 90 (ms)')
+    pl.xlabel('PCL (ms)')
     '''
-    pcl_APs, duration =  HRV_return(model = 'ohara-2011', number_runs = 50, HF_protocol = 'HF', HF_model = 'Elshrif', cell_type = 0,  AP_plot = True, protocol_plot = False, min_PCL = 350, max_PCL =480, APD_time_plot = True)
-    pl.plot(pcl_APs[len(pcl_APs)/2 :], duration[len(pcl_APs)/2:], '.')
+
+    ## Doing cycles in alternan and complex region
+    models_ya = ['ohara-2011','ohara-cipa-v1-2017']
+    HF_ya = ['Gomez','Elshrif']
+
+
+    m = models_ya[1]
+    HF = HF_ya[1]
+    # HF- 1:1 ends 408 (ord-cipa)
+    pcl_APs, duration =  HRV_return(model = m, number_runs = 50, HF_protocol = 'HF', HF_model = HF, cell_type = 0, restitution_curve = True,  AP_plot = True, protocol_plot = False, average_init = 408, APD_time_plot = True)
+
+    # No HF- 1:1 end 287 (ord cipa)
+    pcl_APs, duration =  HRV_return(model = m, number_runs = 50, HF_protocol = None, HF_model = None, cell_type = 0, restitution_curve = True,  AP_plot = True, protocol_plot = False, average_init = 287, APD_time_plot = True)
+
+
+    #pl.plot(pcl_APs[2*len(pcl_APs)/3 :], duration[2*len(pcl_APs)/3:], '.')
+
+    #pcl_APs, duration =  HRV_return(model = m, number_points_up = 50, number_runs = 50, HF_protocol = None, HF_model = None, cell_type = 0,  AP_plot = True, protocol_plot = False, min_PCL = 100, max_PCL =600, APD_time_plot = True)
+    #pl.plot(pcl_APs[len(pcl_APs)/2 :], duration[len(pcl_APs)/2:], '.')
+
+
 
     pl.show()
 if __name__ == "__main__":
