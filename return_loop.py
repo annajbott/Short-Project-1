@@ -8,7 +8,7 @@ from HF_model import *
 ## Return Loop protocol ##
 
 # Plots for protocol, APs and restitution curve
-def return_loop(model, HF_model, number_runs = 25, cell_type = 1, AP_plot = False, protocol_plot = True, restitution_curve = True, APD_time_plot = False):
+def return_loop(model, HF_model, number_runs = 25, cell_type = 1, AP_plot = False, protocol_plot = True, restitution_curve = True):
 
     cell_types = {0:'Endocardial', 1: 'Epicardial', 2: 'Mid-myocardial'}
     if model == 'tentusscher-2006':
@@ -48,12 +48,12 @@ def return_loop(model, HF_model, number_runs = 25, cell_type = 1, AP_plot = Fals
 
 
     max_pcl = 600
-    min_pcl = 150
+    min_pcl = 100
 
     # Make protocol with return_loop included first for no HF (50-90 pattern)
 
     # Linearly space return loop
-    points = np.ndarray.flatten(np.asarray([np.linspace(600,100, 50)[:-1], np.linspace(100,600, 50)[:-1]]))
+    points = np.ndarray.flatten(np.asarray([np.linspace(min_pcl,max_pcl, 50)[:-1], np.linspace(max_pcl,min_pcl, 50)[:-1]]))
     hr_pacing_list = []
     hf_hr_pacing_list = []
 
@@ -74,7 +74,6 @@ def return_loop(model, HF_model, number_runs = 25, cell_type = 1, AP_plot = Fals
     # Setting initital offset to zero
     offset = 0
     hf_offset = 0
-
 
     # Empty array to store offsets of new pacing in
     offset_array = []
@@ -98,7 +97,6 @@ def return_loop(model, HF_model, number_runs = 25, cell_type = 1, AP_plot = Fals
             hf_offset += beats_per_pace*pacing
             hf_pace_array.append(pacing)
             hf_offset_array.append(hf_offset)
-
 
     ## Create and run simulation for healthy ventricular cell model ##
     ## ------------------------------------------------------------ ##
@@ -149,14 +147,13 @@ def return_loop(model, HF_model, number_runs = 25, cell_type = 1, AP_plot = Fals
 
     if protocol_plot == True:
         # Figure to plot HR (BPM) against time
-        hr_bpm = [60*1000.0/element for element in pace_array]
-        hf_hr_bpm = [60*1000.0/element for element in hf_pace_array]
+
 
         pl.figure()
-        pl.plot(offset_array,hr_bpm,'.-')
-        pl.xlim(0,50000)
+        pl.plot(offset_array,pace_array,'.-')
+        pl.xlim(0,60000)
         pl.xlabel('Time (ms)')
-        pl.ylabel('Instantaneous HR (BPM)')
+        pl.ylabel('PCL (ms)')
         pl.title('Return loop protocol')
 
     if restitution_curve == True:
@@ -177,9 +174,9 @@ def return_loop(model, HF_model, number_runs = 25, cell_type = 1, AP_plot = Fals
         length = max(len(duration), len(hf_duration))
         j = 0
         q = 0
-        for i in range(0,length):
-            z = np.nonzero(offset_array < start[i])[0][-1]
-            pcl_start[i] = pace_array[z]
+        for i in range(1,length):
+            z = np.nonzero(offset_array < start[i-1])[0][-1]
+            #pcl_start[i] = pace_array[z]
             if (z/50)%2 == 0:
                 pcl_start_up[j] = pace_array[z]
                 duration_up[j] = duration[i]
@@ -191,7 +188,7 @@ def return_loop(model, HF_model, number_runs = 25, cell_type = 1, AP_plot = Fals
 
         #    hf_z = np.nonzero(hf_offset_array < hf_start[i])[0][-1]
         #    hf_pcl_start[i] = hf_pace_array[hf_z]
-        pcl_start = pcl_start[np.nonzero(pcl_start)]
+        #pcl_start = pcl_start[np.nonzero(pcl_start)]
         pcl_start_up = pcl_start_up[np.nonzero(pcl_start_up)]
         pcl_start_down = pcl_start_down[np.nonzero(pcl_start_down)]
         duration_down = duration_down[np.nonzero(duration_down)]
@@ -199,32 +196,20 @@ def return_loop(model, HF_model, number_runs = 25, cell_type = 1, AP_plot = Fals
 
         #hf_pcl_start = hf_pcl_start[np.nonzero(hf_pcl_start)]
         #pl.plot(pcl_start[len(pcl_start)/2 -1:-1], duration[len(pcl_start)/2:], '.')
-        pl.plot(pcl_start_up[-100:-1], duration_up[-99:], '.')
-        pl.plot(pcl_start_down[-100:-1], duration_down[-99:], '.')
+        pl.plot(pcl_start_up[-100:], duration_up[-100:], '.')
+        pl.plot(pcl_start_down[-100:], duration_down[-100:], '.')
 
         #pl.plot(hf_pace_array[len(pace_array)/2 -1: -1], hf_duration[len(pace_array)/2 :], '.')
         pl.xlabel('PCL (ms)')
         pl.ylabel('APD (ms)')
         pl.title('Restitution Curves for Return-loop Protocol')
-        pl.legend(['Low HR--> High HR', 'High HR--> Low HR'])
+        pl.legend(['High HR--> Low HR','Low HR--> High HR' ])
 
-    ## APD vs time plot ##
-    ## ---------------- ##
-
-    if APD_time_plot == True:
-        pl.figure()
-        pl.plot(offset_array, duration,'.-')
-        pl.plot(hf_offset_array, hf_duration,'.-')
-        pl.xlabel('Time (ms)')
-        pl.ylabel('APD (ms)')
-        pl.title('APD varying over time with the return_loop protocol')
-    # Show plots
-    pl.show()
 
 
 # Main function for testing
 def main():
-    return_loop(model = 'ohara-2011', HF_model = 'Gomez', cell_type = 0, protocol_plot =  False, APD_time_plot = False, restitution_curve = True, AP_plot = False)
+    return_loop(model = 'ohara-2011', HF_model = 'Gomez', cell_type = 0, protocol_plot =  True, restitution_curve = True, AP_plot = False)
 
 if __name__ == "__main__":
     main()
