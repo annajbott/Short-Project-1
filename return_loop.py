@@ -3,7 +3,7 @@ import myokit
 import matplotlib.pyplot as pl
 from manual_APD import ap_duration
 import numpy as np
-from HF_model import *
+
 
 ## Return Loop protocol ##
 
@@ -14,33 +14,20 @@ def return_loop(model, number_runs = 25, cell_type = 1, AP_plot = False, protoco
     if model == 'tentusscher-2006':
         label = 'cell.type'
         name  = 'Ten-Tusscher (2006)'
-        HF_label = 'TT'
     elif model == 'grandi-2010':
         label = 'type.epi'
         cell_types = {0:'Endocardial', 1: 'Epicardial'}
         name = 'Grandi (2010)'
-        HF_label = 'GPB'
     elif model == 'grandi-2010_modified':
         label = 'type.epi'
         cell_types = {0:'Endocardial', 1: 'Epicardial'}
         name = 'Grandi (2010) with late sodium channel'
-        HF_label = 'GPB'
     elif model == 'ohara-2011':
         label = 'cell.mode'
         name = "O'hara (2011)"
-        HF_label = 'Ord'
     elif model == 'ohara-cipa-v1-2017.mmt':
         label = 'cell.celltype'
         name = "O'hara- CiPA (2017)"
-        HF_label = 'Ordcipa'
-    '''
-    m = myokit.load_model('{}.mmt'.format(model))
-    models_HF = {'Ord_HF_Gomez' : Ord_HF_Gomez, 'Ord_HF_Elshrif' : Ord_HF_Elshrif, 'GPB_HF_Gomez' : GPB_HF_Gomez, 'GPB_HF_Gomez': GPB_HF_Moreno, 'TT_HF_Lu' : TT_HF_Lu}
-    if HF_model != None:
-        m_str = '{}_HF_{}'.format(HF_label, HF_model)
-        m_func = models_HF[m_str]
-        hf_m = m_func(cell_type)
-    '''
 
     # Protocol
     p = myokit.Protocol()
@@ -58,7 +45,6 @@ def return_loop(model, number_runs = 25, cell_type = 1, AP_plot = False, protoco
     for i in points:
 
         hr_pacing_list.append(i)
-        hf_hr_pacing_list.append(i)
 
     # Numpy arrays
     hr_pacing_list = np.asarray(hr_pacing_list)
@@ -155,7 +141,6 @@ def return_loop(model, number_runs = 25, cell_type = 1, AP_plot = False, protoco
         pl.plot(pcl_start_up[4*len(pcl_start_up)/5], duration_up[4*len(pcl_start_up)/5], '.')
         pl.plot(pcl_start_down[-100:], duration_down[-100:], '.')
 
-        #pl.plot(hf_pace_array[len(pace_array)/2 -1: -1], hf_duration[len(pace_array)/2 :], '.')
         pl.xlabel('PCL (ms)')
         pl.ylabel('APD (ms)')
         pl.title('Restitution Curves for Return-loop Protocol')
