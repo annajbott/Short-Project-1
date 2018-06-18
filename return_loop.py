@@ -8,7 +8,7 @@ import numpy as np
 ## Return Loop protocol ##
 
 # Plots for protocol, APs and restitution curve
-def return_loop(model, number_runs = 25, cell_type = 1, AP_plot = False, protocol_plot = True, restitution_curve = True):
+def return_loop(model, number_runs = 30, cell_type = 0, AP_plot = False, protocol_plot = True, restitution_curve = True):
 
     cell_types = {0:'Endocardial', 1: 'Epicardial', 2: 'Mid-myocardial'}
     if model == 'tentusscher-2006':
@@ -140,8 +140,8 @@ def return_loop(model, number_runs = 25, cell_type = 1, AP_plot = False, protoco
         duration_down = duration_down[np.nonzero(duration_down)]
         duration_up = duration_up[np.nonzero(duration_up)]
 
-        pl.plot(pcl_start_up[4*len(pcl_start_up)/5], duration_up[4*len(pcl_start_up)/5], '.')
-        pl.plot(pcl_start_down[4*len(pcl_start_down)/5], duration_down[4*len(pcl_start_down)/5], '.')
+        pl.plot(pcl_start_up[3*len(pcl_start_up)/5], duration_up[3*len(pcl_start_up)/5], '.')
+        pl.plot(pcl_start_down[3*len(pcl_start_down)/5], duration_down[3*len(pcl_start_down)/5], '.')
 
         pl.xlabel('PCL (ms)')
         pl.ylabel('APD (ms)')
@@ -152,7 +152,7 @@ def return_loop(model, number_runs = 25, cell_type = 1, AP_plot = False, protoco
     pl.show()
 # Main function for testing
 def main():
-    return_loop(model = 'ohara-2011', cell_type = 0, protocol_plot =  True, restitution_curve = True, AP_plot = False)
+    return_loop(model = 'ohara-2011', cell_type = 0, protocol_plot =  False, restitution_curve = True, AP_plot = False)
 
 if __name__ == "__main__":
     main()
