@@ -126,7 +126,7 @@ def return_loop(model, number_runs = 30, cell_type = 0, AP_plot = False, protoco
             pcl_start[i] = pace_array[z]
 
         pcl_start = pcl_start[np.nonzero(pcl_start)]
-        print 'paces' pcl_start[-101:-1]
+        print 'paces', pcl_start[-101:-1]
         print 'apd', duration[-100:]
         pl.plot(pcl_start[len(pcl_start)/2 -1: -1], duration[len(pcl_start)/2:], '.','b')
 
