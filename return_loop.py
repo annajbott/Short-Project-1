@@ -8,7 +8,7 @@ import numpy as np
 ## Return Loop protocol ##
 
 # Plots for protocol, APs and restitution curve
-def return_loop(model, number_runs = 30, cell_type = 0, AP_plot = False, protocol_plot = True, restitution_curve = True):
+def return_loop(model, number_runs = 30, cell_type = 0, AP_plot = False, protocol_plot = True, restitution_curve = True, linear = True):
 
     cell_types = {0:'Endocardial', 1: 'Epicardial', 2: 'Mid-myocardial'}
     if model == 'tentusscher-2006':
@@ -40,13 +40,19 @@ def return_loop(model, number_runs = 30, cell_type = 0, AP_plot = False, protoco
 
     # Make protocol with return_loop included first for no HF (50-90 pattern)
 
-    # Linearly space return loop
-    points = np.ndarray.flatten(np.asarray([np.linspace(min_pcl,max_pcl, 50)[:-1], np.linspace(max_pcl,min_pcl, 50)[:-1]]))
     hr_pacing_list = []
-
-    for i in points:
-
-        hr_pacing_list.append(i)
+    # Linearly space return loop
+    if linear == True:
+        points = np.ndarray.flatten(np.asarray([np.linspace(min_pcl,max_pcl, 50)[:-1], np.linspace(max_pcl,min_pcl, 50)[:-1]]))
+        for i in points:
+            hr_pacing_list.append(i)
+    else:
+        # Sine wave points
+        max_hr = 60000.0/max_pcl
+        min_hr = 60000.0/min_pcl
+        average = np.round((max_hr + min_hr)/2.0,0)
+        amplitude = np.round((max_hr - min_hr)/2.0,0)
+        hr_pacing_list.append(average +amplitude*np.sin(i-np.pi/2.0))
 
     # Numpy arrays
     hr_pacing_list = np.asarray(hr_pacing_list)
@@ -120,12 +126,12 @@ def return_loop(model, number_runs = 30, cell_type = 0, AP_plot = False, protoco
             pcl_start[i] = pace_array[z]
 
         pcl_start = pcl_start[np.nonzero(pcl_start)]
-
-        pl.plot(pcl_start[len(pcl_start)/2 -1: -1], duration[len(pcl_start)/2:], '.')
+        print 'paces' pcl_start[-101:-1]
+        print 'apd', duration[-100:]
+        pl.plot(pcl_start[len(pcl_start)/2 -1: -1], duration[len(pcl_start)/2:], '.','b')
 
         pl.xlabel('PCL (ms)')
         pl.ylabel('APD (ms)')
-        pl.title('Restitution Curves for Return-loop Protocol')
 
 
     pl.show()
