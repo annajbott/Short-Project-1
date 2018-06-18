@@ -29,6 +29,8 @@ def return_loop(model, number_runs = 25, cell_type = 1, AP_plot = False, protoco
         label = 'cell.celltype'
         name = "O'hara- CiPA (2017)"
 
+    m = myokit.load_model('{}.mmt'.format(model))
+
     # Protocol
     p = myokit.Protocol()
 
