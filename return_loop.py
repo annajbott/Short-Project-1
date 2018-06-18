@@ -69,9 +69,9 @@ def return_loop(model, number_runs = 30, cell_type = 0, AP_plot = False, protoco
         for pacing in pacing_list:
 
             p.schedule(1, start = offset, duration = 0.5, period = pacing, multiplier = beats_per_pace)
+            offset_array.append(offset)
             offset += beats_per_pace*pacing
             pace_array.append(pacing)
-            offset_array.append(offset)
 
     ## Create and run simulation for healthy ventricular cell model ##
     ## ------------------------------------------------------------ ##
@@ -112,41 +112,21 @@ def return_loop(model, number_runs = 30, cell_type = 0, AP_plot = False, protoco
         if len(duration)< len(pace_array):
             pace_array = pace_array[:-1]
         offset_array = np.asarray(offset_array)
-        pcl_start = np.zeros(len(duration))
-
-        pcl_start_up = np.zeros(len(duration))
-        pcl_start_down = np.zeros(len(duration))
-        duration_up = np.zeros(len(duration))
-        duration_down = np.zeros(len(duration))
+        pcl_start = np.zeros(len(duration) + 1)
 
         length = len(duration)
-        j = 0
-        q = 0
-        for i in range(1,length):
-            z = np.nonzero(offset_array < start[i-1])[0][-1]
-            #pcl_start[i] = pace_array[z]
-            if (z/50)%2 == 0:
-                pcl_start_up[j] = pace_array[z]
-                duration_up[j] = duration[i]
-                j += 1
-            else:
-                pcl_start_down[q] = pace_array[z]
-                duration_down[q] = duration[i]
-                q += 1
+        for i in range(0,length):
+            z = np.nonzero(offset_array < start[i])[0][-1]
+            pcl_start[i] = pace_array[z]
 
-        #pcl_start = pcl_start[np.nonzero(pcl_start)]
-        pcl_start_up = pcl_start_up[np.nonzero(pcl_start_up)]
-        pcl_start_down = pcl_start_down[np.nonzero(pcl_start_down)]
-        duration_down = duration_down[np.nonzero(duration_down)]
-        duration_up = duration_up[np.nonzero(duration_up)]
+        pcl_start = pcl_start[np.nonzero(pcl_start)]
 
-        pl.plot(pcl_start_up[3*len(pcl_start_up)/5], duration_up[3*len(pcl_start_up)/5], '.')
-        pl.plot(pcl_start_down[3*len(pcl_start_down)/5], duration_down[3*len(pcl_start_down)/5], '.')
+        pl.plot(pcl_start_up[len(pcl_start_up)/2 -1: -1], duration_up[len(pcl_start_up)/2], '.')
+        pl.plot(pcl_start_down[len(pcl_start_down)/2 -1: -1], duration_down[len(pcl_start_down)/2], '.')
 
         pl.xlabel('PCL (ms)')
         pl.ylabel('APD (ms)')
         pl.title('Restitution Curves for Return-loop Protocol')
-        pl.legend(['High HR--> Low HR','Low HR--> High HR' ])
 
 
     pl.show()
