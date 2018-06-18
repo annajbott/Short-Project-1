@@ -121,8 +121,7 @@ def return_loop(model, number_runs = 30, cell_type = 0, AP_plot = False, protoco
 
         pcl_start = pcl_start[np.nonzero(pcl_start)]
 
-        pl.plot(pcl_start_up[len(pcl_start_up)/2 -1: -1], duration_up[len(pcl_start_up)/2], '.')
-        pl.plot(pcl_start_down[len(pcl_start_down)/2 -1: -1], duration_down[len(pcl_start_down)/2], '.')
+        pl.plot(pcl_start[len(pcl_start_up)/2 -1: -1], duration[len(pcl_start_up)/2], '.')
 
         pl.xlabel('PCL (ms)')
         pl.ylabel('APD (ms)')
