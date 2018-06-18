@@ -44,6 +44,12 @@ def HRV_return(model, HF_model = None, HF_protocol = None, number_points_up = 30
         m_func = models_HF[m_str]
         m = m_func(cell_type)
         HF_model_label = 'HF ' + HF_model
+        if HF_protocol == 'HF':
+            col = models_HF_col[m_str]
+        else:
+            col = 'turquoise'
+    else:
+        col = 'b'
 
 
     # Protocol
@@ -75,7 +81,7 @@ def HRV_return(model, HF_model = None, HF_protocol = None, number_points_up = 30
         average = np.round((max_hr + min_hr)/2.0,0)
         amplitude = np.round((max_hr - min_hr)/2.0,0)
 
-    # If average is specified, take that value, but use amplitudes from earlier
+    # If average is specified, take that value and convet to HR, but use amplitudes from earlier
     if average_init != None:
         average = 60000.0/average_init
     for i in points:
@@ -161,7 +167,7 @@ def HRV_return(model, HF_model = None, HF_protocol = None, number_points_up = 30
         pl.figure()
         if len(start) > len(duration):
             start = start[0:-1]
-        pl.plot(start, duration,'.-')
+        pl.plot(start, duration,'.-', color = col)
         pl.xlabel('Time (sec)')
         pl.ylabel('APD (ms)')
         #pl.title('APD varying over time with the HRV protocol')
@@ -170,7 +176,7 @@ def HRV_return(model, HF_model = None, HF_protocol = None, number_points_up = 30
 
     if restitution_curve == True:
         pl.figure()
-        pl.plot(pcl_start[4*len(pcl_start)/5 :], duration[4*len(pcl_start)/5:], '.')
+        pl.plot(pcl_start[4*len(pcl_start)/5 :], duration[4*len(pcl_start)/5:], '.', color = col)
         pl.xlabel('PCL (ms)')
         pl.ylabel('APD 90 (ms)')
 
@@ -230,10 +236,12 @@ def main():
     m = models_ya[1]
     HF = HF_ya[1]
     # HF- 1:1 ends 408 (ord-cipa)
-    pcl_APs, duration =  HRV_return(model = m, number_runs = 50, HF_protocol = 'HF', HF_model = HF, cell_type = 0, restitution_curve = True,  AP_plot = True, protocol_plot = False, average_init = 408, APD_time_plot = True)
+    pcl_APs, duration =  HRV_return(model = m, number_runs = 50, HF_protocol = 'HF', HF_model = HF, cell_type = 0, restitution_curve = True,  AP_plot = False, protocol_plot = False, average_init = 408, APD_time_plot = True)
+    # HF model, 1:1 ends 408, healthy protocol (amplitude 19bpm)
+    pcl_APs, duration =  HRV_return(model = m, number_runs = 50, HF_protocol = None, HF_model = HF, cell_type = 0, restitution_curve = True,  AP_plot = False, protocol_plot = False, average_init = 408, APD_time_plot = True)
 
     # No HF- 1:1 end 287 (ord cipa)
-    pcl_APs, duration =  HRV_return(model = m, number_runs = 50, HF_protocol = None, HF_model = None, cell_type = 0, restitution_curve = True,  AP_plot = True, protocol_plot = False, average_init = 287, APD_time_plot = True)
+    pcl_APs, duration =  HRV_return(model = m, number_runs = 50, HF_protocol = None, HF_model = None, cell_type = 0, restitution_curve = True,  AP_plot = False, protocol_plot = False, average_init = 287, APD_time_plot = True)
 
 
     #pl.plot(pcl_APs[2*len(pcl_APs)/3 :], duration[2*len(pcl_APs)/3:], '.')
