@@ -2,12 +2,17 @@
 import myokit
 import matplotlib.pyplot as pl
 from manual_APD import ap_duration
+model = 'grandi-2010'
+s1s2_protocol(model, number_S1, PCL_S1 = 1000, pre_pacing = 200, min_di = 10, max_di = 1000, number_di = 30, repolarisation = 90, cell_type = 0, log_scale = False, HF_model = None, plot_from_function = True)
+
+
 
 ### Ten-Tusscher S1-S2 protocol- Figure 5B ###
 ### -------------------------------------- ###
 
 ## 10 S1 beats at 600ms PCL, followed by single S2 beat with varying pacing
 # Get the model and protocol, create a simulation
+'''
 m = myokit.load_model('tentusscher-2006.mmt')
 
 # Pacing for S1 beats is 600ms
@@ -70,6 +75,7 @@ pl.ylabel('APD (ms)')
 pl.title('Ten-Tusscher (2006) {} Cell 10 x S1, 1 x S2 Protocol Restitution Curve (Fig 5B)'.format(cell_type))
 pl.legend(['APD 50','APD 90'])
 pl.xlim(0,600)
+'''
 pl.show()
 
 # Parameters matching 2nd row table 2 ten-Tusscher model 2006 (should be slope of 1.1)
