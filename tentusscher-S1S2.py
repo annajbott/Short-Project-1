@@ -24,7 +24,7 @@ s.set_constant('cell.type', cell_types[cell_type])
 s.pre(pcl * 9)
 
 # Setting a step size to increase pacing for S2 interval by
-step_size = 40
+step_size = 25
 
 # Final S1 beat and S2 beat, with APD 50 and APD 90
 # PCL = APD +DI
@@ -49,7 +49,7 @@ for percent in range(50,91,40):
         d = s.run(paces*pcl)
 
         # Run using function.
-        start, duration = ap_duration(d, paces, repolarisation = percent)
+        start, duration, thresh = ap_duration(d, paces, repolarisation = percent)
 
         # Storing apd and DI for this pacing length
         apd_duration.append(duration[1])
@@ -62,6 +62,9 @@ for percent in range(50,91,40):
         s.reset()
 
     pl.plot(di, apd_duration)
+    print percent
+    print di
+    print apd_duration
     pl.plot(di, apd_duration, 'x',label='_nolegend_')
 
 # Plot S1S2 protocol restitution curve
