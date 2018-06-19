@@ -21,7 +21,7 @@ model = 'tentusscher-2006'
 
 #model = 'ohara-cipa-v1-2017'
 model = 'grandi-2010'
-dynamic_protocol(model, number_stages = 60, max_pcl = 600, min_pcl = 100, HF_model = None ,voltage_plot = False, cell_type = 0, log_scale = False)
+dynamic_protocol(model, number_stages = 150, max_pcl = 1000, min_pcl = 100, HF_model = None ,voltage_plot = False, cell_type = 0, log_scale = False)
 
 #dynamic_protocol(model, number_stages = 60, stimuli_per_pace = 50, min_pcl = 100, voltage_plot = True, cell_type = 0)
 '''
